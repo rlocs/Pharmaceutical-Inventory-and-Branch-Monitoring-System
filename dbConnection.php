@@ -1,7 +1,7 @@
 <?php
 class Database {
     private $host = 'localhost';
-    private $dbname = 'pharmaceutical_db'; // User to create this database in MySQL
+    private $dbname = 'pharmapos_db'; // User to create this database in MySQL
     private $username = 'root';
     private $password = '';
 

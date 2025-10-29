@@ -1,10 +1,3 @@
-<?php
-session_start();
-if (!isset($_SESSION['user_id'])) {
-    header("Location: login.php");
-    exit;
-}
-?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -13,7 +6,7 @@ if (!isset($_SESSION['user_id'])) {
     <title>MERCURY System</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/GitHub/Pharmaceutical-Inventory-and-Branch-Monitoring-System/admin/css/style.css">
+    <link rel="stylesheet" href="staff/css/style.css">
 </head>
 <body class="font-sans">
 
@@ -29,12 +22,14 @@ if (!isset($_SESSION['user_id'])) {
 
             <!-- NAV LINKS -->
             <nav id="navbar" class="hidden md:flex items-center space-x-8">
-                <a href="modules/dashboard.php" class="nav-link active" data-module="dashboard">Dashboard</a>
-                <a href="modules/med_inventory.php" class="nav-link" data-module="inventory">Med Inventory</a>
-                <a href="modules/pos.php" class="nav-link" data-module="pos">POS</a>
-                <a href="modules/reports.php" class="nav-link" data-module="reports">Reports</a>
-                <a href="modules/account.php" class="nav-link" data-module="account">Account</a>
+                <a href="staff/dashboard.php" class="nav-link active" data-module="dashboard">Dashboard</a>
+                <a href="staff/med_inventory.php" class="nav-link" data-module="inventory">Med Inventory</a>
+                <a href="staff/pos/pos.php" class="nav-link" data-module="pos">POS</a>
+                <a href="staff/reports.php" class="nav-link" data-module="reports">Reports</a>
+                <a href="staff/account.php" class="nav-link" data-module="account">Account</a>
             </nav>
+
+            
 
             <!-- MOBILE MENU BUTTON -->
             <button id="mobile-menu-button" class="md:hidden p-2 text-gray-700 rounded-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-primary-accent" aria-label="Toggle menu">
@@ -47,11 +42,11 @@ if (!isset($_SESSION['user_id'])) {
         <!-- MOBILE MENU -->
         <div id="mobile-menu" class="hidden md:hidden bg-white shadow-md">
             <div class="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-                <a href="modules/dashboard.php" class="mobile-link active">Dashboard</a>
-                <a href="modules/med_inventory.php" class="mobile-link">Med Inventory</a>
-                <a href="modules/pos.php" class="mobile-link">POS</a>
-                <a href="modules/reports.php" class="mobile-link">Reports</a>
-                <a href="modules/account.php" class="mobile-link">Account</a>
+                <a href="staff/dashboard.php" class="mobile-link active">Dashboard</a>
+                <a href="staff/med_inventory.php" class="mobile-link">Med Inventory</a>
+                <a href="staff/pos/pos.php" class="mobile-link">POS</a>
+                <a href="staff/reports.php" class="mobile-link">Reports</a>
+                <a href="staff/account.php" class="mobile-link">Account</a>
             </div>
         </div>
 
@@ -99,26 +94,24 @@ if (!isset($_SESSION['user_id'])) {
                 <div class="space-y-4 mb-6">
                     <h4 class="text-md font-semibold text-white mb-2">Alerts & Notifications</h4>
 
-                    <div class="bg-white p-4 rounded-lg shadow-lg text-gray-900">
-                        <h5 class="text-sm font-semibold text-red-600 mb-1">Low Stock</h5>
-                        <ul class="text-xs text-gray-700 space-y-1">
-                            <li>Paracetamol (5 left)</li>
-                            <li>Ibuprofen (3 left)</li>
+                    <div class="bg-white p-4 rounded-lg shadow-lg text-gray-900 mb-6">
+                        <h5 class="text-sm font-semibold text-red-600 mb-1">Low Stock / Out of Stock</h5>
+                        <ul id="low-stock-list" class="text-xs text-gray-700 space-y-1">
+                            <li class="font-medium text-gray-500">Loading low stock alerts...</li>
                         </ul>
                     </div>
 
                     <div class="bg-white p-4 rounded-lg shadow-lg text-gray-900">
                         <h5 class="text-sm font-semibold text-yellow-600 mb-1">Expiring Soon</h5>
-                        <ul class="text-xs text-gray-700 space-y-1">
-                            <li>Amoxicillin - 5 days</li>
-                            <li>Vitamin C - 9 days</li>
+                        <ul id="expiring-soon-list" class="text-xs text-gray-700 space-y-1">
+                            <li class="font-medium text-gray-500">Loading expiration alerts...</li>
                         </ul>
                     </div>
 
                     <div class="bg-white p-4 rounded-lg shadow-lg text-gray-900">
                         <h5 class="text-sm font-semibold text-gray-800 mb-1">Expired</h5>
-                        <ul class="text-xs text-gray-700 space-y-1">
-                            <li>Cough Syrup - expired</li>
+                        <ul id="expired-list" class="text-xs text-gray-700 space-y-1">
+                            <li class="font-medium text-gray-500">Loading expired alerts...</li>
                         </ul>
                     </div>
                 </div>
@@ -136,6 +129,6 @@ if (!isset($_SESSION['user_id'])) {
         </div>
     </div>
 
-    <script src="/GitHub/Pharmaceutical-Inventory-and-Branch-Monitoring-System/admin/js/script.js"></script>
+    <script src="staff/js/script.js"></script>
 </body>
 </html>
