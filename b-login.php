@@ -1,98 +1,296 @@
 <?php
+// ensure session cookie is available site-wide
+session_set_cookie_params(0, '/');
 session_start();
-require_once 'dbConnection.php'; // Make sure this contains the Database class
+// The database connection file MUST use PDO and define a Database class with a getConnection() method.
+require_once 'dbconnection.php'; 
 
-$db = new Database();
-$conn = $db->getConnection();
+// --- Configuration ---
+try {
+    // Assuming dbconnection.php defines a Database class and returns a PDO connection
+    $db = new Database();
+    $conn = $db->getConnection();
+} catch (Exception $e) {
+    // Log the error and redirect with a generic message
+    error_log("Database connection error: " . $e->getMessage());
+    $_SESSION['login_alert'] = 'System error: Could not connect to the database.';
+    header("Location: login.php");
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Check if this is a forgot password form submission
+    
+    // --------------------------------------------------------------------------
+    // A. FORGOT PASSWORD LOGIC (Reset Password with UserCode and DateOfBirth)
+    // --------------------------------------------------------------------------
     if (isset($_POST['confirm_password']) && isset($_POST['dob']) && isset($_POST['username'])) {
-        // Forgot password logic with username and dob verification
-        $username = trim($_POST['username']);
+        
+        $userCode = trim($_POST['username']); 
         $dob = trim($_POST['dob']);
         $password = trim($_POST['password']);
         $confirm_password = trim($_POST['confirm_password']);
 
-        if (!empty($username) && !empty($dob) && !empty($password) && !empty($confirm_password)) {
-            if ($password !== $confirm_password) {
-                echo "<script>alert('Passwords do not match.'); window.location='forgot.php';</script>";
-                exit;
-            }
-
-            // Check if user exists with matching username and dob
-            $query = "SELECT * FROM users WHERE username = :username AND dob = :dob";
-            $stmt = $conn->prepare($query);
-            $stmt->bindParam(':username', $username, PDO::PARAM_STR);
-            $stmt->bindParam(':dob', $dob, PDO::PARAM_STR);
-            $stmt->execute();
-            $user = $stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($user) {
-                // Inline change password
-                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $update_query = "UPDATE users SET password = :password WHERE username = :username";
-                $update_stmt = $conn->prepare($update_query);
-                $update_stmt->bindParam(':password', $hashed_password, PDO::PARAM_STR);
-                $update_stmt->bindParam(':username', $username, PDO::PARAM_STR);
-
-                if ($update_stmt->execute()) {
-                    echo "<script>alert('Password has been reset successfully. Please login with your new password.'); window.location='login.php';</script>";
-                    exit;
-                } else {
-                    echo "<script>alert('Failed to update password. Please try again.'); window.location='forgot.php';</script>";
-                    exit;
-                }
-            } else {
-                echo "<script>alert('Username and Date of Birth do not match our records.'); window.location='forgot.php';</script>";
-                exit;
-            }
-        } else {
-            echo "<script>alert('Please fill in all fields.'); window.location='forgot.php';</script>";
+        // Input validation
+        if (empty($userCode) || empty($dob) || empty($password) || empty($confirm_password)) {
+            $_SESSION['login_alert'] = 'Please fill in all fields.';
+            header("Location: forgot.php");
             exit;
         }
+
+        if ($password !== $confirm_password) {
+            $_SESSION['login_alert'] = 'Passwords do not match.';
+            header("Location: forgot.php");
+            exit;
+        }
+
+        try {
+            // Hash the new password before sending it to the stored procedure
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+
+            // Use the SP_ResetPassword stored procedure
+            $stmt = $conn->prepare("CALL SP_ResetPassword(:userCode, :dob, :newHashedPassword)");
+            $stmt->bindParam(':userCode', $userCode, PDO::PARAM_STR);
+            $stmt->bindParam(':dob', $dob, PDO::PARAM_STR);
+            $stmt->bindParam(':newHashedPassword', $hashed_password, PDO::PARAM_STR);
+            $stmt->execute();
+
+            // Fetch the result from the SELECT in the stored procedure
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            $isSuccess = ($result && $result['Success'] == 1);
+            
+            if ($isSuccess) {
+                // Success! Redirect to login with a success message
+                $_SESSION['login_alert'] = '✅ Password has been reset successfully. Please login with your new password.';
+                header("Location: login.php");
+                exit;
+            } else {
+                $_SESSION['login_alert'] = 'Username (Code) and Date of Birth do not match our records.';
+                header("Location: forgot.php");
+                exit;
+            }
+
+        } catch (PDOException $e) {
+             error_log("Forgot Password Error: " . $e->getMessage());
+            $_SESSION['login_alert'] = 'A system error occurred during password verification.';
+            header("Location: forgot.php");
+            exit;
+        }
+
     } else {
-        // Existing login logic
-        $username = trim($_POST['username']);
+        // --------------------------------------------------------------------------
+        // B. STANDARD LOGIN LOGIC (Verify UserCode and HashedPassword)
+        // --------------------------------------------------------------------------
+        $userCode = trim($_POST['username']); 
         $password = trim($_POST['password']);
 
-        if (!empty($username) && !empty($password)) {
-            $query = "SELECT * FROM users WHERE username = :username";
-            $stmt = $conn->prepare($query);
-            $stmt->bindParam(':username', $username, PDO::PARAM_STR);
+        // Input validation
+        if (empty($userCode) || empty($password)) {
+            $_SESSION['login_alert'] = 'Please fill in both fields.';
+            header("Location: login.php");
+            exit;
+        }
+
+        try {
+            // Use the SP_AuthenticateUser stored procedure
+            $stmt = $conn->prepare("CALL SP_AuthenticateUser(:userCode)");
+            $stmt->bindParam(':userCode', $userCode, PDO::PARAM_STR);
             $stmt->execute();
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($user) {
-                if (password_verify($password, $user['password'])) {
-                    $_SESSION['user_id'] = $user['user_id'];
-                    $_SESSION['username'] = $user['username'];
-                    $_SESSION['role'] = $user['role'];
+                // Verify password against the stored hash
+                if (password_verify($password, $user['HashedPassword'])) {
+                    
+                    // Password is correct: Set session variables
+                    $_SESSION['loggedin'] = true;
+                    $_SESSION['user_id'] = $user['UserID'];
+                    $_SESSION['user_code'] = $user['UserCode'];
+                    $_SESSION['user_role'] = $user['Role']; // This comes from the SP
+                    $_SESSION['branch_id'] = $user['BranchID'];
+                    $_SESSION['first_name'] = $user['FirstName']; // This comes from the SP
+                    $_SESSION['last_name'] = $user['LastName']; // This comes from the SP
 
-                    // Redirect based on role
-                    switch ($user['role']) {
+                    // Send push notifications for any pending alerts and chat messages
+                    sendLoginNotifications($user['UserID'], $user['BranchID']);
+
+                    // ROUTING LOGIC based on ROLE and BRANCHID
+                    switch ($user['Role']) {
                         case 'Admin':
                             header("Location: admin/index.php");
                             exit;
+
                         case 'Staff':
-                            header("Location: staff/index.php");
+                            $branchId = $_SESSION['branch_id'];
+                            header("Location: branch{$branchId}/staff1b{$branchId}.php");
                             exit;
+
                         default:
-                            echo "Unknown role.";
+                            $_SESSION['login_alert'] = 'Unknown role or account type.';
+                            header("Location: login.php");
                             exit;
                     }
                 } else {
-                    echo "<script>alert('Incorrect password.'); window.location='login.php';</script>";
+                    $_SESSION['login_alert'] = 'Incorrect password.';
+                    header("Location: login.php");
+                    exit;
                 }
             } else {
-                echo "<script>alert('Username not found.'); window.location='login.php';</script>";
+                $_SESSION['login_alert'] = 'Username (Code) not found.';
+                header("Location: login.php");
+                exit;
             }
-        } else {
-            echo "<script>alert('Please fill in both fields.'); window.location='login.php';</script>";
+
+        } catch (PDOException $e) {
+             error_log("Login Error: " . $e->getMessage());
+            $_SESSION['login_alert'] = 'A database error occurred during login.';
+            header("Location: login.php");
+            exit;
         }
     }
 } else {
+    // If user accessed b-login.php directly without POST data
     header("Location: login.php");
     exit;
 }
+
+/**
+ * Send push notifications for pending alerts and chat messages on login
+ */
+function sendLoginNotifications($userId, $branchId) {
+    global $conn;
+
+    try {
+        // Get alerts count
+        $alertsCount = getAlertsCount($conn, $branchId);
+
+        // Get unread chat count
+        $chatCount = getUnreadChatCount($conn, $userId);
+
+        // Send notifications if there are any
+        if ($alertsCount > 0 || $chatCount > 0) {
+            // Send alert notification
+            if ($alertsCount > 0) {
+                sendNotification($conn, $userId, 'alert', 'Inventory Alerts', "You have {$alertsCount} inventory alerts requiring attention", 'med_inventory.php');
+            }
+
+            // Send chat notification
+            if ($chatCount > 0) {
+                sendNotification($conn, $userId, 'chat', 'New Messages', "You have {$chatCount} unread chat messages", '#chat');
+            }
+        }
+    } catch (Exception $e) {
+        error_log("Error sending login notifications: " . $e->getMessage());
+        // Don't fail login if notifications fail
+    }
+}
+
+/**
+ * Get alerts count for a branch
+ */
+function getAlertsCount($conn, $branchId) {
+    $sql = "SELECT
+                COUNT(*) as count
+            FROM BranchInventory bi
+            JOIN medicines m ON bi.MedicineID = m.MedicineID
+            WHERE bi.BranchID = ?
+              AND (
+                bi.ExpiryDate < CURDATE() OR
+                bi.ExpiryDate BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY) OR
+                bi.Stocks = 0 OR
+                (bi.Stocks > 0 AND bi.Stocks <= 10)
+              )";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$branchId]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    return (int)($result['count'] ?? 0);
+}
+
+/**
+ * Get unread chat count for a user
+ */
+function getUnreadChatCount($conn, $userId) {
+    $sql = "SELECT COUNT(*) as count
+            FROM ChatMessages cm
+            INNER JOIN ChatParticipants cp ON cm.ConversationID = cp.ConversationID
+            WHERE cp.UserID = ?
+              AND cm.SenderID != ?
+              AND cm.Timestamp > COALESCE(cp.LastReadTimestamp, '1970-01-01')";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$userId, $userId]);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    return (int)($result['count'] ?? 0);
+}
+
+/**
+ * Send a notification via the notification API
+ */
+function sendNotification($conn, $userId, $type, $title, $message, $link = null) {
+    // Save to database
+    $sql = "INSERT INTO Notifications (UserID, Type, Title, Message, Link, IsRead, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)";
+
+    $stmt = $conn->prepare($sql);
+    $stmt->execute([$userId, $type, $title, $message, $link]);
+
+    // Send via ntfy if configured
+    $ntfy_enabled = getenv('NTFY_ENABLED') === 'true' || file_exists(__DIR__ . '/branch1/config/ntfy_enabled.txt');
+    if ($ntfy_enabled) {
+        sendNtfyNotification($userId, $title, $message, $type);
+    }
+}
+
+/**
+ * Send notification via ntfy
+ */
+function sendNtfyNotification($userId, $title, $message, $type = 'info') {
+    // Get user's ntfy topic (if configured)
+    $ntfy_server = getenv('NTFY_SERVER') ?: 'https://ntfy.sh';
+    $ntfy_topic = getenv('NTFY_TOPIC') ?: 'pharma-notifications-' . $userId;
+
+    // Priority mapping
+    $priority_map = [
+        'error' => 5,
+        'warning' => 4,
+        'alert' => 3,
+        'chat' => 2,
+        'info' => 1
+    ];
+    $priority = $priority_map[$type] ?? 3;
+
+    // Tags/emoji mapping
+    $tags_map = [
+        'error' => ['rotating_light', 'red_circle'],
+        'warning' => ['warning', 'yellow_circle'],
+        'alert' => ['bell', 'orange_circle'],
+        'chat' => ['speech_balloon', 'blue_circle'],
+        'info' => ['information_source', 'green_circle']
+    ];
+    $tags = $tags_map[$type] ?? ['bell'];
+
+    $url = rtrim($ntfy_server, '/') . '/' . $ntfy_topic;
+
+    $ch = curl_init($url);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $message);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Title: ' . $title,
+        'Priority: ' . $priority,
+        'Tags: ' . implode(',', $tags)
+    ]);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode !== 200) {
+        error_log("ntfy notification failed: HTTP $httpCode - $response");
+    }
+
+    return $httpCode === 200;
+}
+
 ?>

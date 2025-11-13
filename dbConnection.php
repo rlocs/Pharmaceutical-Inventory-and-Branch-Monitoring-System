@@ -1,21 +1,34 @@
 <?php
 class Database {
-    private $host = 'localhost';
-    private $dbname = 'pharmaceutical_db'; // User to create this database in MySQL
-    private $username = 'root';
-    private $password = '';
+    // This IP MUST be the address of the computer running the MySQL database.
+    private $host = '192.168.18.83';
 
+    private $db_name = 'pharmaceutical_db';
+    private $username = 'pharma_user'; // The new user you created for network access
+    private $password = '2003'; // The new password you created (removed typo 'a$')
     private $conn;
 
-    public function getConnection() {
-        $this->conn = null;
+    public function __construct() {
+        $this->connect();
+    }
+
+    private function connect() {
         try {
-            $this->conn = new PDO("mysql:host=" . $this->host . ";dbname=" . $this->dbname, $this->username, $this->password);
-            $this->conn->exec("set names utf8");
+            $this->conn = new PDO(
+                "mysql:host={$this->host};dbname={$this->db_name};charset=utf8mb4",
+                $this->username,
+                $this->password
+            );
             $this->conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        } catch(PDOException $exception) {
-            echo "Connection error: " . $exception->getMessage();
+        } catch (PDOException $e) {
+            // Hide sensitive error from users, log it instead
+            error_log("DB Connection error in dbconnection.php: " . $e->getMessage());
+            // Re-throw the exception so the calling script can handle it.
+            throw $e;
         }
+    }
+
+    public function getConnection() {
         return $this->conn;
     }
 }

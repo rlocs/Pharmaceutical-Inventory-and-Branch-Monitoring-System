@@ -1,18 +1,40 @@
+<?php
+session_start();
+
+// The database connection file MUST use PDO and define a Database class with a getConnection() method.
+require_once 'dbconnection.php';
+
+// --- Configuration ---
+try {
+    // Establish database connection
+    $db = new Database();
+    $conn = $db->getConnection();
+} catch (Exception $e) {
+    // Log the error and show a generic message if connection fails
+    error_log("Database connection error in forgot.php: " . $e->getMessage());
+    $_SESSION['login_alert'] = 'System error: Could not connect to the database.';
+    // Redirect to login page if DB is down, as this page is unusable.
+    header("Location: login.php");
+    exit;
+}
+
+// Check for and clear any alert messages stored in the session
+$login_alert = '';
+if (isset($_SESSION['login_alert'])) {
+    $login_alert = $_SESSION['login_alert'];
+    unset($_SESSION['login_alert']);
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Reset your password for the Health Center System. Enter your username, date of birth, and new password.">
-    <title>Forgot Password - Health Center System</title>
+    <title>Forgot Password - Pharmaceutical System</title>
 
-    <!-- Boxicons for icons -->
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" crossorigin="anonymous">
-    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
     <style>
         * {
             margin: 0;
@@ -38,8 +60,9 @@
         }
 
         .square {
-            width: 400px;
-            height: 500px; /* Taller for more fields */
+            width: 450px; /* Increased width for more space */
+            height: auto; /* Auto height to fit content */
+            min-height: 400px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -48,13 +71,7 @@
             box-shadow: 0 6px 8px rgba(22, 22, 22, 0.1);
             border-radius: 15px;
             flex-direction: column;
-            padding: 27.9px;
-        }
-
-        .square img {
-            width: 116%;
-            height: auto;
-            border-radius: 10px;
+            padding: 28px;
         }
 
         .form-group {
@@ -88,31 +105,13 @@
 
         .btn-reset:hover {
             background-color: rgb(25, 54, 243);
-            transform: scale(1.02);
         }
 
         .reset-title {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: bold;
             margin-bottom: 20px;
             color: #25344f;
-        }
-
-        .back-link {
-            text-align: center;
-            width: 100%;
-            margin-top: 10px;
-        }
-
-        .back-link a {
-            font-size: 14px;
-            color: #0040aa;
-            text-decoration: none;
-        }
-
-        .back-link a:hover {
-            text-decoration: underline;
         }
     </style>
 </head>
@@ -120,32 +119,22 @@
 <body>
     <div class="container">
         <div class="square">
-            <img src="sanpedro.png" alt="Health Center Logo">
-        </div>
-        <div class="square">
-            <div class="reset-title">Reset Password</div>
+            <div class="reset-title">Reset Your Password</div>
+
+            <?php
+            if (!empty($login_alert)) {
+                echo '<div class="alert alert-danger" role="alert" style="width: 100%;">' . htmlspecialchars($login_alert) . '</div>';
+            }
+            ?>
+            
             <form action="b-login.php" method="POST">
-                <div class="form-group">
-                    <i class='bx bxs-user'></i>
-                    <input type="text" class="form-control" name="username" placeholder="Username" required>
-                </div>
-                <div class="form-group">
-                    <i class='bx bxs-calendar'></i>
-                    <input type="date" class="form-control" name="dob" placeholder="Date of Birth" required>
-                </div>
-                <div class="form-group">
-                    <i class='bx bxs-lock-alt'></i>
-                    <input type="password" class="form-control" name="password" placeholder="New Password" required>
-                </div>
-                <div class="form-group">
-                    <i class='bx bxs-lock'></i>
-                    <input type="password" class="form-control" name="confirm_password" placeholder="Confirm New Password" required>
-                </div>
+                <div class="form-group"><i class='bx bxs-user'></i><input type="text" class="form-control" name="username" placeholder="User Code" required></div>
+                <div class="form-group"><i class='bx bxs-calendar'></i><input type="date" class="form-control" name="dob" placeholder="Date of Birth" required></div>
+                <div class="form-group"><i class='bx bxs-lock-alt'></i><input type="password" class="form-control" name="password" placeholder="New Password" required></div>
+                <div class="form-group"><i class='bx bxs-lock-alt'></i><input type="password" class="form-control" name="confirm_password" placeholder="Confirm New Password" required></div>
                 <button type="submit" class="btn-reset">Reset Password</button>
+                <div class="text-center mt-3"><a href="login.php">Back to Login</a></div>
             </form>
-            <div class="back-link">
-                <a href="login.php">Back to Login</a>
-            </div>
         </div>
     </div>
 </body>
