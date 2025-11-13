@@ -1,19 +1,41 @@
+<?php
+// Start the session to check for existing login state or alerts
+session_start();
+
+// Check for and clear any login error messages stored in the session by b-login.php
+$login_alert = '';
+if (isset($_SESSION['login_alert'])) {
+    $login_alert = $_SESSION['login_alert'];
+    // Clear the alert so it doesn't reappear on refresh
+    unset($_SESSION['login_alert']);
+}
+
+// Always reset the login state *after* capturing the alert.
+// This ensures that visiting the login page is a clean start and prevents redirect loops.
+if (isset($_SESSION['loggedin'])) {
+    // Unset all of the session variables.
+    $_SESSION = array();
+    // Finally, destroy the session.
+    session_destroy();
+}
+
+?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Login to access the Pharmaceutical Inventory System. Enter your username and password to continue. Secure and easy login process.">
-    <title>Login - Pharmaceutical Inventory System</title>
+    <meta name="description" content="Login to access the Pharmaceutical Inventory and Branch Monitoring System. Secure and easy login process.">
+    <title>Login - Pharmaceutical Inventory and Branch Monitoring System</title>
 
-    <!-- Boxicons for icons -->
     <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css" crossorigin="anonymous">
     <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
     <style>
+        /* CSS styles remain exactly the same as provided */
         * {
             margin: 0;
             padding: 0;
@@ -26,7 +48,7 @@
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color:rgb(255, 255, 255);
+            background-color: rgb(255, 255, 255);
         }
 
         .container {
@@ -52,8 +74,8 @@
         }
 
         .square img {
-            width: 116%;
-            height: auto;
+            width: 90%; /* Adjusted for better responsiveness */
+            height: auto; 
             border-radius: 10px;
         }
 
@@ -121,14 +143,30 @@
 <body>
     <div class="container">
         <div class="square">
-            <img src="sanpedro.png" alt="Pharmaceutical Logo">
+            <img src="sanpedro.png" alt="Health Center Logo">
         </div>
         <div class="square">
             <div class="login-title">Login</div>
+
+            <?php
+            // Display any login alerts with conditional styling for success/error.
+            if (!empty($login_alert)) {
+                // Check if the alert is a success message
+                if (strpos($login_alert, '✅') !== false) {
+                    $alert_class = 'alert-success';
+                } else {
+                    $alert_class = 'alert-danger';
+                }
+                echo '<div class="alert ' . $alert_class . '" role="alert" style="width: 100%;">
+                        ' . htmlspecialchars($login_alert, ENT_QUOTES, 'UTF-8') . '
+                      </div>';
+            }
+            ?>
+            
             <form action="b-login.php" method="POST">
                 <div class="form-group">
                     <i class='bx bxs-user'></i>
-                    <input type="text" class="form-control" name="username" id="username" placeholder="Username" required>
+                    <input type="text" class="form-control" name="username" id="username" placeholder="User Code" required> 
                 </div>
                 <div class="form-group">
                     <i class='bx bxs-lock-alt'></i>

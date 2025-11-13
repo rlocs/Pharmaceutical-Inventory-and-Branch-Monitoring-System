@@ -1,8 +1,9 @@
-# TODO: Fix Med Inventory Module
+# TODO: Implement Zoom Button for Cross-Branch Chat
 
-- [x] Remove invalid require_once '../js/med_search&filter'; from med_inventory.php
-- [x] Add <script src="js/med_search&filter.js"></script> to the HTML head in med_inventory.php
-- [x] Remove or correct <script src="../../pos.js"></script> in med_inventory.php
-- [x] Fix stock display: Change ** to <strong> for bold in med_inventory.php
-- [x] Verify data displays correctly in med inventory module (PHP logic fetches and groups data by category, HTML displays cards with details)
-- [x] Test search and filter functionality (JS file included, logic for filtering by name and category)
+## Steps to Complete
+
+- [x] Add Zoom button to chat header in `branch1/includes/sidebar.php`
+- [x] Add CSS for chat modal in `branch1/css/style.css`
+- [x] Implement zoom functionality in `branch1/js/chat.js` (event listener, modal creation, close logic)
+- [x] Test zoom toggle, message sending, and conversation switching in both views
+- [x] Verify sidebar accessibility during zoom
