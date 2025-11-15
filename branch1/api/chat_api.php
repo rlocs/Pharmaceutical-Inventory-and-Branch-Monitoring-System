@@ -10,6 +10,30 @@ function send_response($data) {
     exit;
 }
 
+// --- Helper function to create notifications for chat messages ---
+function createNotification($conn, $type, $category, $title, $message, $link = '', $userId = null) {
+    try {
+        if ($userId === null) {
+            $userId = $_SESSION['user_id'] ?? null;
+        }
+        $branchId = $_SESSION['branch_id'] ?? 1;
+        // Try to get recipient's branch if we have a user_id (they might be in different branch)
+        if ($userId) {
+            $b = $conn->prepare("SELECT BranchID FROM Accounts WHERE UserID = ? LIMIT 1");
+            $b->execute([$userId]);
+            $r = $b->fetch(PDO::FETCH_ASSOC);
+            if ($r) $branchId = $r['BranchID'];
+        }
+        
+        $stmt = $conn->prepare("INSERT INTO Notifications (UserID, BranchID, Type, Category, Title, Message, Link, IsRead) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
+        $stmt->execute([$userId, $branchId, $type, $category, $title, $message, $link]);
+        return true;
+    } catch (Exception $e) {
+        error_log("Notification creation failed: " . $e->getMessage());
+        return false;
+    }
+}
+
 // --- Ensure user is logged in ---
 if (!isset($_SESSION['loggedin']) || !isset($_SESSION['user_id'])) {
     send_response(['success' => false, 'error' => 'Authentication required.']);
@@ -31,72 +55,11 @@ $action = $_POST['action'] ?? $_GET['action'] ?? '';
 switch ($action) {
     case 'get_conversations':
         try {
-            // Improved query to prevent duplicates - use DISTINCT on ConversationID only
-            $sql = "SELECT DISTINCT
-                c.ConversationID,
-                c.LastMessageTimestamp,
-                -- Other participant details (get the first other participant)
-                (SELECT a.FirstName
-                 FROM ChatParticipants cp
-                 JOIN Accounts a ON cp.UserID = a.UserID
-                 WHERE cp.ConversationID = c.ConversationID
-                   AND cp.UserID != ?
-                 ORDER BY cp.UserID
-                 LIMIT 1) AS FirstName,
-                (SELECT a.LastName
-                 FROM ChatParticipants cp
-                 JOIN Accounts a ON cp.UserID = a.UserID
-                 WHERE cp.ConversationID = c.ConversationID
-                   AND cp.UserID != ?
-                 ORDER BY cp.UserID
-                 LIMIT 1) AS LastName,
-                (SELECT b.BranchName
-                 FROM ChatParticipants cp
-                 JOIN Accounts a ON cp.UserID = a.UserID
-                 JOIN Branches b ON a.BranchID = b.BranchID
-                 WHERE cp.ConversationID = c.ConversationID
-                   AND cp.UserID != ?
-                 ORDER BY cp.UserID
-                 LIMIT 1) AS BranchName,
-                -- Last message
-                (SELECT cm.MessageContent
-                 FROM ChatMessages cm
-                 WHERE cm.ConversationID = c.ConversationID
-                 ORDER BY cm.Timestamp DESC
-                 LIMIT 1) AS LastMessage,
-                -- Unread message count
-                (SELECT COUNT(*)
-                 FROM ChatMessages cm
-                 WHERE cm.ConversationID = c.ConversationID
-                   AND cm.Timestamp > COALESCE((
-                       SELECT cp.LastReadTimestamp
-                       FROM ChatParticipants cp
-                       WHERE cp.ConversationID = c.ConversationID
-                         AND cp.UserID = ?
-                       LIMIT 1
-                   ), '1970-01-01')) AS UnreadCount
-            FROM ChatConversations c
-            INNER JOIN ChatParticipants p ON c.ConversationID = p.ConversationID
-            WHERE p.UserID = ?
-            GROUP BY c.ConversationID
-            ORDER BY c.LastMessageTimestamp DESC";
-
-            $stmt = $conn->prepare($sql);
-            $stmt->execute([$current_user_id, $current_user_id, $current_user_id, $current_user_id, $current_user_id]);
+            $stmt = $conn->prepare("CALL SP_GetConversations(:user_id)");
+            $stmt->bindParam(':user_id', $current_user_id, PDO::PARAM_INT);
+            $stmt->execute();
             $conversations = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Additional deduplication on PHP side as safety measure
-            $uniqueConversations = [];
-            $seenIds = [];
-            foreach ($conversations as $conv) {
-                $convId = $conv['ConversationID'];
-                if (!in_array($convId, $seenIds)) {
-                    $seenIds[] = $convId;
-                    $uniqueConversations[] = $conv;
-                }
-            }
-            
-            send_response(['success' => true, 'conversations' => $uniqueConversations]);
+            send_response(['success' => true, 'conversations' => $conversations]);
         } catch (PDOException $e) {
             error_log("Get conversations error: " . $e->getMessage());
             send_response(['success' => false, 'error' => 'Failed to fetch conversations.']);
@@ -111,24 +74,15 @@ switch ($action) {
 
         try {
             // Update last read timestamp for this participant
-            $update = $conn->prepare("UPDATE ChatParticipants SET LastReadTimestamp = CURRENT_TIMESTAMP WHERE ConversationID = ? AND UserID = ?");
-            $update->execute([$conversation_id, $current_user_id]);
+            $update = $conn->prepare("CALL SP_UpdateLastRead(:conv, :uid)");
+            $update->bindParam(':conv', $conversation_id, PDO::PARAM_INT);
+            $update->bindParam(':uid', $current_user_id, PDO::PARAM_INT);
+            $update->execute();
 
             // Fetch messages
-            $stmt = $conn->prepare("SELECT
-                m.MessageID,
-                m.SenderUserID,
-                m.MessageContent,
-                m.Timestamp,
-                a.FirstName,
-                a.LastName,
-                b.BranchName
-            FROM ChatMessages m
-            JOIN Accounts a ON m.SenderUserID = a.UserID
-            JOIN Branches b ON a.BranchID = b.BranchID
-            WHERE m.ConversationID = ?
-            ORDER BY m.Timestamp ASC");
-            $stmt->execute([$conversation_id]);
+            $stmt = $conn->prepare("CALL SP_GetMessages(:conv)");
+            $stmt->bindParam(':conv', $conversation_id, PDO::PARAM_INT);
+            $stmt->execute();
             $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
             send_response(['success' => true, 'messages' => $messages]);
         } catch (PDOException $e) {
@@ -146,34 +100,30 @@ switch ($action) {
         }
 
         try {
-            // Get the sender's BranchID
-            $branch_stmt = $conn->prepare("SELECT BranchID FROM Accounts WHERE UserID = ?");
-            $branch_stmt->execute([$current_user_id]);
-            $branch_result = $branch_stmt->fetch(PDO::FETCH_ASSOC);
-            $branch_id = $branch_result['BranchID'];
+            $stmt = $conn->prepare("CALL SP_SendMessage(:conv, :sender, :msg)");
+            $stmt->bindParam(':conv', $conversation_id, PDO::PARAM_INT);
+            $stmt->bindParam(':sender', $current_user_id, PDO::PARAM_INT);
+            $stmt->bindParam(':msg', $message_content, PDO::PARAM_STR);
+            $stmt->execute();
+            $newMessage = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Insert the new message
-            $stmt = $conn->prepare("INSERT INTO ChatMessages (ConversationID, SenderUserID, BranchID, MessageContent) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$conversation_id, $current_user_id, $branch_id, $message_content]);
-            $newMessageID = $conn->lastInsertId();
-
-            // Update the conversation's last message timestamp
-            $update = $conn->prepare("UPDATE ChatConversations SET LastMessageTimestamp = CURRENT_TIMESTAMP WHERE ConversationID = ?");
-            $update->execute([$conversation_id]);
-
-            // Return the newly created message
-            $select = $conn->prepare("SELECT
-                m.MessageID,
-                m.SenderUserID,
-                m.MessageContent,
-                m.Timestamp,
-                a.FirstName,
-                a.LastName
-            FROM ChatMessages m
-            JOIN Accounts a ON m.SenderUserID = a.UserID
-            WHERE m.MessageID = ?");
-            $select->execute([$newMessageID]);
-            $newMessage = $select->fetch(PDO::FETCH_ASSOC);
+            // Create notification for recipients of this conversation
+            try {
+                $recipients = $conn->prepare("SELECT UserID FROM ChatParticipants WHERE ConversationID = ? AND UserID != ?");
+                $recipients->execute([$conversation_id, $current_user_id]);
+                $recipientList = $recipients->fetchAll(PDO::FETCH_ASSOC);
+                
+                $sender = $conn->prepare("SELECT FirstName, LastName FROM Accounts WHERE UserID = ?");
+                $sender->execute([$current_user_id]);
+                $senderInfo = $sender->fetch(PDO::FETCH_ASSOC);
+                $senderName = trim(($senderInfo['FirstName'] ?? '') . ' ' . ($senderInfo['LastName'] ?? ''));
+                
+                foreach ($recipientList as $recipient) {
+                    createNotification($conn, 'chat', 'Message', 'New message from ' . $senderName, substr($message_content, 0, 100) . (strlen($message_content) > 100 ? '...' : ''), 'javascript:void(0);', $recipient['UserID']);
+                }
+            } catch (Throwable $e) {
+                error_log("Chat notification error: " . $e->getMessage());
+            }
 
             send_response(['success' => true, 'message' => $newMessage]);
         } catch (PDOException $e) {
@@ -184,41 +134,11 @@ switch ($action) {
 
     case 'get_users':
         try {
-            // Get current user's branch
-            $branch_stmt = $conn->prepare("SELECT BranchID FROM Accounts WHERE UserID = ?");
-            $branch_stmt->execute([$current_user_id]);
-            $current_branch = $branch_stmt->fetch(PDO::FETCH_ASSOC);
-            $current_branch_id = $current_branch['BranchID'] ?? null;
-            
-            // Get all other users with their branch names
-            $stmt = $conn->prepare("SELECT 
-                a.UserID, 
-                a.FirstName, 
-                a.LastName, 
-                a.Role, 
-                a.BranchID,
-                b.BranchName
-            FROM Accounts a
-            LEFT JOIN Branches b ON a.BranchID = b.BranchID
-            WHERE a.UserID != ?
-            ORDER BY a.Role DESC, a.FirstName, a.LastName");
-            $stmt->execute([$current_user_id]);
+            $stmt = $conn->prepare("SELECT UserID, FirstName, LastName, Role, BranchID FROM Accounts WHERE UserID != :current_user_id ORDER BY FirstName, LastName");
+            $stmt->bindParam(':current_user_id', $current_user_id, PDO::PARAM_INT);
+            $stmt->execute();
             $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            
-            // Filter to show: Admin, and staff from other branches (not same branch)
-            $filteredUsers = [];
-            foreach ($users as $user) {
-                // Always show Admin
-                if ($user['Role'] === 'Admin') {
-                    $filteredUsers[] = $user;
-                }
-                // Show staff from other branches only
-                else if ($user['Role'] === 'Staff' && $user['BranchID'] != $current_branch_id) {
-                    $filteredUsers[] = $user;
-                }
-            }
-            
-            send_response(['success' => true, 'users' => $filteredUsers]);
+            send_response(['success' => true, 'users' => $users]);
         } catch (PDOException $e) {
             error_log("Get Users error: " . $e->getMessage());
             send_response(['success' => false, 'error' => 'Failed to fetch users.']);
@@ -232,41 +152,13 @@ switch ($action) {
         }
 
         try {
-            $conversation_id = null;
+            $stmt = $conn->prepare("CALL SP_FindOrCreateConversation(:u1, :u2)");
+            $stmt->bindParam(':u1', $current_user_id, PDO::PARAM_INT);
+            $stmt->bindParam(':u2', $recipient_id, PDO::PARAM_INT);
+            $stmt->execute();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Get BranchIDs for both users
-            $branch_stmt = $conn->prepare("SELECT BranchID FROM Accounts WHERE UserID = ?");
-            $branch_stmt->execute([$current_user_id]);
-            $branch1 = $branch_stmt->fetch(PDO::FETCH_ASSOC)['BranchID'];
-
-            $branch_stmt->execute([$recipient_id]);
-            $branch2 = $branch_stmt->fetch(PDO::FETCH_ASSOC)['BranchID'];
-
-            // Try to find existing 1-on-1 conversation between the two users
-            $find_stmt = $conn->prepare("SELECT cp1.ConversationID
-                FROM ChatParticipants cp1
-                JOIN ChatParticipants cp2 ON cp1.ConversationID = cp2.ConversationID
-                WHERE cp1.UserID = ? AND cp2.UserID = ?
-                GROUP BY cp1.ConversationID
-                HAVING COUNT(*) = 2
-                LIMIT 1");
-            $find_stmt->execute([$current_user_id, $recipient_id]);
-            $existing = $find_stmt->fetch(PDO::FETCH_ASSOC);
-
-            if ($existing) {
-                $conversation_id = $existing['ConversationID'];
-            } else {
-                // Create new conversation and add participants
-                $insert_conv = $conn->prepare("INSERT INTO ChatConversations (LastMessageTimestamp) VALUES (CURRENT_TIMESTAMP)");
-                $insert_conv->execute();
-                $conversation_id = $conn->lastInsertId();
-
-                $insert_part = $conn->prepare("INSERT INTO ChatParticipants (ConversationID, UserID, BranchID, LastReadTimestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)");
-                $insert_part->execute([$conversation_id, $current_user_id, $branch1]);
-                $insert_part->execute([$conversation_id, $recipient_id, $branch2]);
-            }
-
-            send_response(['success' => true, 'conversation_id' => $conversation_id]);
+            send_response(['success' => true, 'conversation_id' => $result['ConversationID']]);
         } catch (PDOException $e) {
             error_log("Create conversation error: " . $e->getMessage());
             send_response(['success' => false, 'error' => 'Database error while creating conversation.']);

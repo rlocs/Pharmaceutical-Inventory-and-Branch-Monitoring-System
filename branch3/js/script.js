@@ -1,449 +1,271 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const mobileMenuButton = document.getElementById('mobile-menu-button');
-    const mobileMenu = document.getElementById('mobile-menu');
+         // State management (initialized globally)
+        let isChatMaximized = false;
+        let isChatCollapsed = false;
 
-    // Toggle mobile menu
-    if (mobileMenuButton) {
-        mobileMenuButton.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
-        });
-    }
-});
+        // Element declarations
+        let sidebar, iconsSection, backdrop, chatWidget, chatTitle, chatBody, activeChatContent, chatBackButton, chatNotifBubble, zoomIcon, collapseIcon, chatCollapseButton, chatNewButton, chatZoomButton, nonChatContent, zoomedChatHost, sidebarChatParent;
 
-// --- CROSS-BRANCH CHAT WIDGET ---
-document.addEventListener('DOMContentLoaded', () => {
-    const chatWidget = document.getElementById('chat-widget');
-    if (!chatWidget) return;
-
-    const chatHeader = chatWidget.querySelector('#chat-header');
-    const chatBody = chatWidget.querySelector('#chat-body');
-    const chatNotificationBubble = chatWidget.querySelector('#chat-notification-bubble');
-    const chatToggleButton = chatWidget.querySelector('#chat-toggle-button');
-    const zoomHost = document.getElementById('zoomed-chat-host');
-
-    let messageStatusMap = new Map();
-    let conversations = [];
-    let currentView = 'list';
-    let activeConversationId = null;
-    let pollingInterval;
-    let isZoomed = false;
-
-    const API_URL = 'api/chat_api.php';
-
-    // --- UI Functions ---
-    function updateNotificationBubble(count) {
-        if (count > 0) {
-            chatNotificationBubble.textContent = count > 99 ? '99+' : count;
-            chatNotificationBubble.classList.remove('hidden');
-        } else {
-            chatNotificationBubble.classList.add('hidden');
-        }
-        document.dispatchEvent(new CustomEvent('chat:new-messages', { 
-            detail: { unreadCount: count } 
-        }));
-    }
-
-    function renderMessageStatus(status) {
-        const icons = {
-            sending: '<svg class="w-3 h-3 text-gray-400" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"/></svg>',
-            sent: '<svg class="w-3 h-3 text-gray-400" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" d="M5 13l4 4L19 7" fill="none"/></svg>',
-            delivered: '<svg class="w-3 h-3 text-blue-400" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" d="M5 13l4 4L19 7" fill="none"/></svg>',
-            failed: '<svg class="w-3 h-3 text-red-500" viewBox="0 0 24 24"><path stroke="currentColor" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" fill="none"/></svg>'
-        };
-        return icons[status] || icons.sent;
-    }
-
-    function renderConversationList() {
-        currentView = 'list';
-        activeConversationId = null;
-        chatBody.innerHTML = '';
-
-        if (!conversations || conversations.length === 0) {
-            chatBody.innerHTML = '<p class="text-center text-gray-500 text-sm p-4">No conversations yet.</p>';
-            return;
-        }
-
-        // Group by unique participants
-        const uniqueConvs = new Map();
-        conversations.forEach(conv => {
-            const key = `${conv.OtherParticipantName}|${conv.OtherParticipantRole}|${conv.OtherParticipantBranch}`;
-            if (!uniqueConvs.has(key) || new Date(conv.LastMessageTimestamp) > new Date(uniqueConvs.get(key).LastMessageTimestamp)) {
-                uniqueConvs.set(key, conv);
-            }
-        });
-
-        let totalUnread = 0;
-        uniqueConvs.forEach(conv => {
-            const unreadCount = parseInt(conv.UnreadCount || 0);
-            totalUnread += unreadCount;
-
-            const el = document.createElement('div');
-            el.className = 'p-2 border-b border-gray-200 cursor-pointer hover:bg-gray-100';
-            el.dataset.conversationId = conv.ConversationID;
-            el.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <div>
-                        <p class="font-semibold text-sm">${conv.OtherParticipantName}</p>
-                        <p class="text-xs text-gray-500">${conv.OtherParticipantRole} - ${conv.OtherParticipantBranch || 'Branch undefined'}</p>
-                    </div>
-                    ${unreadCount > 0 ? `<span class="bg-blue-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">${unreadCount}</span>` : ''}
-                </div>
-                ${conv.LastMessage ? `<p class="text-xs text-gray-500 truncate mt-1">${conv.LastMessage}</p>` : ''}
-            `;
-            el.addEventListener('click', () => openConversation(conv.ConversationID));
-            chatBody.appendChild(el);
-        });
-
-        updateNotificationBubble(totalUnread);
-    }
-
-    function renderMessagesView(conversationId, messages, participant) {
-        currentView = 'messages';
-        activeConversationId = conversationId;
-
-        chatBody.innerHTML = `
-            <div class="p-2 border-b bg-white">
-                <button id="back-to-list" class="text-sm text-blue-600 hover:underline">&larr; Back</button>
-                <div class="mt-1">
-                        <p class="font-semibold text-sm">${participant?.OtherParticipantName || 'Chat'}</p>
-                        <p class="text-xs text-gray-500">${participant?.OtherParticipantRole} - ${participant?.OtherParticipantBranch || 'Branch undefined'}</p>
-                </div>
-            </div>
-            <div id="messages-container" class="p-2 space-y-2 overflow-y-auto" style="max-height: ${isZoomed ? '400px' : '200px'}">
-                ${messages.map(msg => {
-                    const isSender = String(msg.SenderUserID) === String(window.currentUserId);
-                    const status = messageStatusMap.get(msg.MessageID) || 'delivered';
-                    return `
-                        <div class="flex flex-col ${isSender ? 'items-end' : 'items-start'}" data-message-id="${msg.MessageID}">
-                            <div class="max-w-[75%] px-3 py-2 rounded-lg ${isSender ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'}">
-                                <p class="text-sm break-words">${msg.MessageContent}</p>
-                            </div>
-                            <div class="flex items-center gap-1 mt-1">
-                                <span class="text-xs text-gray-400">
-                                    ${new Date(msg.Timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                </span>
-                                ${isSender ? renderMessageStatus(status) : ''}
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-            <div class="p-2 border-t bg-white">
-                <form id="message-form" class="flex items-center gap-2">
-                    <input type="text" id="message-input" placeholder="Type a message..." 
-                           class="flex-1 rounded-lg border border-gray-300 p-2 text-sm" required>
-                    <button type="submit" class="p-2 text-blue-600 hover:bg-gray-100 rounded-full">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
-                        </svg>
-                    </button>
-                </form>
-            </div>
-        `;
-
-        document.getElementById('back-to-list').addEventListener('click', fetchConversations);
-        setupMessageForm();
-
-        const container = document.getElementById('messages-container');
-        container.scrollTop = container.scrollHeight;
-    }
-
-    function renderUsersView(users) {
-        currentView = 'users';
-        activeConversationId = null;
-
-        chatBody.innerHTML = `
-            <div class="p-2 border-b">
-                <button id="back-to-list" class="text-sm text-blue-600 hover:underline">&larr; Back</button>
-            </div>
-            <div class="p-2">
-                ${users.map(user => `
-                    <div class="p-2 cursor-pointer hover:bg-gray-100 rounded-lg mb-1" data-user-id="${user.UserID}">
-                        <p class="font-semibold text-sm">${user.FirstName} ${user.LastName}</p>
-                        <p class="text-xs text-gray-500">${user.Role} - Branch ${user.BranchID}</p>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-
-        document.getElementById('back-to-list').addEventListener('click', fetchConversations);
-        chatBody.querySelectorAll('[data-user-id]').forEach(el => {
-            el.addEventListener('click', () => createConversation(el.dataset.userId));
-        });
-    }
-
-    function setupMessageForm() {
-        const form = document.getElementById('message-form');
-        const input = document.getElementById('message-input');
-        
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const text = input.value.trim();
-            if (!text) return;
-
-            // Create temporary message
-            const tempId = 'temp_' + Date.now();
-            const tempMsg = {
-                MessageID: tempId,
-                MessageContent: text,
-                SenderUserID: window.currentUserId,
-                Timestamp: new Date().toISOString()
-            };
-
-            // Show sending status
-            messageStatusMap.set(tempId, 'sending');
-            appendMessage(tempMsg);
-            input.value = '';
-
-            try {
-                const result = await sendMessage(activeConversationId, text);
-                if (result.success) {
-                    messageStatusMap.set(tempId, 'delivered');
-                } else {
-                    messageStatusMap.set(tempId, 'failed');
-                }
-            } catch (error) {
-                messageStatusMap.set(tempId, 'failed');
-            }
-
-            updateMessageStatus(tempId);
-        });
-    }
-
-    function appendMessage(msg) {
-        const container = document.getElementById('messages-container');
-        if (!container) return;
-
-        const el = document.createElement('div');
-        const isSender = String(msg.SenderUserID) === String(window.currentUserId);
-        const status = messageStatusMap.get(msg.MessageID) || 'delivered';
-
-        el.className = `flex flex-col ${isSender ? 'items-end' : 'items-start'}`;
-        el.dataset.messageId = msg.MessageID;
-        el.innerHTML = `
-            <div class="max-w-[75%] px-3 py-2 rounded-lg ${isSender ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800'}">
-                <p class="text-sm break-words">${msg.MessageContent}</p>
-            </div>
-            <div class="flex items-center gap-1 mt-1">
-                <span class="text-xs text-gray-400">
-                    ${new Date(msg.Timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                </span>
-                ${isSender ? renderMessageStatus(status) : ''}
-            </div>
-        `;
-
-        container.appendChild(el);
-        container.scrollTop = container.scrollHeight;
-    }
-
-    function updateMessageStatus(messageId) {
-        const msgEl = document.querySelector(`[data-message-id="${messageId}"]`);
-        if (msgEl) {
-            const status = messageStatusMap.get(messageId);
-            const statusEl = msgEl.querySelector('.flex.items-center.gap-1');
-            if (statusEl) {
-                statusEl.innerHTML = `
-                    <span class="text-xs text-gray-400">
-                        ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                    </span>
-                    ${renderMessageStatus(status)}
-                `;
-            }
-        }
-    }
-
-    // --- API Functions ---
-    async function fetchConversations() {
-        chatBody.innerHTML = '<p class="text-center text-gray-500 text-sm p-4">Loading conversations...</p>';
-        try {
-            const response = await fetch(`${API_URL}?action=get_conversations`, { credentials: 'same-origin' });
-            const data = await response.json();
-            if (data.success) {
-                conversations = data.conversations || [];
-                renderConversationList();
-            } else {
-                throw new Error(data.error || 'Failed to load conversations');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            chatBody.innerHTML = '<p class="p-3 text-center text-sm text-red-600">Failed to load conversations.</p>';
-        }
-    }
-
-    async function fetchUsers() {
-        chatBody.innerHTML = '<p class="text-center text-gray-500 text-sm p-4">Loading users...</p>';
-        try {
-            const response = await fetch(`${API_URL}?action=get_users`, { credentials: 'same-origin' });
-            const data = await response.json();
-            if (data.success) {
-                renderUsersView(data.users || []);
-            } else {
-                throw new Error(data.error || 'Failed to load users');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            chatBody.innerHTML = '<p class="p-3 text-center text-sm text-red-600">Failed to load users.</p>';
-        }
-    }
-
-    async function openConversation(conversationId) {
-        try {
-            const response = await fetch(`${API_URL}?action=get_messages&conversation_id=${conversationId}`, 
-                { credentials: 'same-origin' });
-            const data = await response.json();
-            if (data.success) {
-                const participant = conversations.find(c => String(c.ConversationID) === String(conversationId));
-                renderMessagesView(conversationId, data.messages || [], participant);
-            } else {
-                throw new Error(data.error || 'Failed to load messages');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            chatBody.innerHTML = '<p class="p-3 text-center text-sm text-red-600">Failed to load messages.</p>';
-        }
-    }
-
-    async function createConversation(userId) {
-        try {
-            const formData = new FormData();
-            formData.append('action', 'create_conversation');
-            formData.append('recipient_id', userId);
-
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                body: formData,
-                credentials: 'same-origin'
-            });
-            const data = await response.json();
+        /**
+         * Toggles the visibility of the sidebar and the icons section.
+         */
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const backdrop = document.getElementById('backdrop');
+            const iconsSection = document.getElementById('icons-section');
             
-            if (data.success && data.conversation_id) {
-                await openConversation(data.conversation_id);
-            } else {
-                throw new Error(data.error || 'Failed to create conversation');
+            if (!sidebar || !backdrop || !iconsSection) {
+                 console.error("Sidebar elements not found during toggle attempt.");
+                 return;
             }
-        } catch (error) {
-            console.error('Error:', error);
-            chatBody.innerHTML = '<p class="p-3 text-center text-sm text-red-600">Failed to create conversation.</p>';
+
+            const isSidebarOpen = sidebar.classList.toggle('open');
+            backdrop.classList.toggle('visible');
+
+            if (isSidebarOpen) {
+                iconsSection.classList.add('hidden');
+            } else {
+                iconsSection.classList.remove('hidden');
+                // Attempt to call the reset function defined below
+                if (typeof setChatView !== 'undefined') {
+                    setChatView('list');
+                    // Reset global chat states
+                    if (typeof isChatMaximized !== 'undefined') isChatMaximized = false;
+                    if (typeof isChatCollapsed !== 'undefined') isChatCollapsed = false;
+                }
+            }
         }
-    }
+ /**
+         * Switches the chat widget view between conversation list and active chat.
+         * @param {string} viewType - 'list' or 'chat'
+         * @param {string} [chatPartner] - The name of the person being chatted with.
+         */
+        function setChatView(viewType, chatPartner = 'Cross-Branch Chat') {
+            if (!chatBody || !activeChatContent || !chatTitle || !chatBackButton || !chatNotifBubble) {
+                console.error("Chat view elements not fully initialized, cannot set chat view.");
+                return;
+            }
+            
+            if (isChatCollapsed && !isChatMaximized) return; // Guard: Don't show content if collapsed
 
-    async function sendMessage(conversationId, message) {
-        const formData = new FormData();
-        formData.append('action', 'send_message');
-        formData.append('conversation_id', conversationId);
-        formData.append('message', message);
-
-        try {
-            const response = await fetch(API_URL, {
-                method: 'POST',
-                body: formData,
-                credentials: 'same-origin'
-            });
-            const data = await response.json();
-            return { success: data.success, message: data.message };
-        } catch (error) {
-            console.error('Error:', error);
-            return { success: false, error: 'Failed to send message' };
-        }
-    }
-
-    // --- Event Listeners ---
-    chatHeader.addEventListener('click', (e) => {
-        const newButton = e.target.closest('button[title="New Message"]');
-        if (newButton) {
-            fetchUsers();
-            return;
-        }
-
-        const toggleButton = e.target.closest('#chat-toggle-button');
-        if (toggleButton) {
-            chatBody.classList.toggle('hidden');
-            const icon = toggleButton.querySelector('svg path');
-            icon.setAttribute('d', chatBody.classList.contains('hidden') 
-                ? 'M19 9l-7 7-7-7' // down arrow
-                : 'M5 15l7-7 7 7'   // up arrow
-            );
-        }
-    });
-
-    // Zoom functionality
-    const zoomButton = chatWidget.querySelector('#chat-zoom-button');
-    if (zoomButton && zoomHost) {
-        zoomButton.addEventListener('click', () => {
-            isZoomed = !isZoomed;
-            if (isZoomed) {
-                zoomHost.classList.remove('hidden');
-                zoomHost.innerHTML = `
-                    <div class="bg-white rounded-xl shadow-lg max-w-2xl w-full mx-4 overflow-hidden">
-                        ${chatWidget.innerHTML}
-                    </div>
-                `;
+            if (viewType === 'chat') {
+                // Switch to Active Chat view
+                chatTitle.textContent = chatPartner;
+                chatBody.classList.add('hidden');
+                activeChatContent.classList.remove('hidden');
+                chatBackButton.classList.remove('hidden');
+                chatNotifBubble.classList.add('hidden');
                 
-                // Re-attach event listeners to zoomed chat
-                const zoomedChat = zoomHost.querySelector('#chat-widget');
-                setupZoomedChat(zoomedChat);
             } else {
-                zoomHost.classList.add('hidden');
-                zoomHost.innerHTML = '';
+                // Switch back to Conversation List view
+                chatTitle.textContent = 'Cross-Branch Chat';
+                chatBody.classList.remove('hidden');
+                activeChatContent.classList.add('hidden');
+                chatBackButton.classList.add('hidden');
+                chatNotifBubble.classList.remove('hidden');
             }
-        });
-
-        // Close zoomed chat when clicking outside
-        zoomHost.addEventListener('click', (e) => {
-            if (e.target === zoomHost) {
-                zoomButton.click();
-            }
-        });
-    }
-
-    function setupZoomedChat(zoomedChat) {
-        const header = zoomedChat.querySelector('#chat-header');
-        const body = zoomedChat.querySelector('#chat-body');
-
-        if (header) {
-            header.addEventListener('click', (e) => {
-                const newButton = e.target.closest('button[title="New Message"]');
-                if (newButton) {
-                    fetchUsers();
-                    return;
-                }
-
-                const toggleButton = e.target.closest('#chat-toggle-button');
-                if (toggleButton) {
-                    body.classList.toggle('hidden');
-                    const icon = toggleButton.querySelector('svg path');
-                    icon.setAttribute('d', body.classList.contains('hidden')
-                        ? 'M19 9l-7 7-7-7'
-                        : 'M5 15l7-7 7 7'
-                    );
-                }
-            });
         }
 
-        // Re-render current view
-        if (currentView === 'messages' && activeConversationId) {
-            openConversation(activeConversationId);
-        } else if (currentView === 'users') {
-            fetchUsers();
-        } else {
-            renderConversationList();
+        /**
+         * Handler for clicking a chat item.
+         * @param {string} partnerName 
+         */
+        function openChat(partnerName) {
+            setChatView('chat', partnerName);
         }
-    }
 
-    // Start polling for updates
-    function startPolling() {
-        pollingInterval = setInterval(async () => {
-            if (currentView === 'list') {
-                await fetchConversations();
-            } else if (currentView === 'messages' && activeConversationId) {
-                await openConversation(activeConversationId);
+        /**
+         * Toggles the chat widget content between visible (expanded) and hidden (collapsed) states in the sidebar.
+         */
+        function toggleChatCollapse() {
+            if (isChatMaximized) return; // Cannot collapse/expand the modal
+            
+            if (!chatBody || !activeChatContent || !collapseIcon || !chatCollapseButton) {
+                console.error("Chat collapse elements not fully initialized, cannot collapse/expand chat.");
+                return;
             }
-        }, 5000);
-    }
 
-    // Initialize
-    fetchConversations();
-    startPolling();
-});
+            isChatCollapsed = !isChatCollapsed;
 
+            // Toggle the content visibility and icon
+            if (isChatCollapsed) {
+                // Collapse: hide all content below the header
+                chatBody.classList.add('hidden');
+                activeChatContent.classList.add('hidden');
+                
+                // Change icon to chevron down (to indicate it can be expanded)
+                collapseIcon.innerHTML = `<path d="m6 9 6 6 6-6"/>`;
+                chatCollapseButton.title = 'Expand Chat';
+
+            } else {
+                // Expand: show the appropriate content (list or active chat)
+                setChatView(chatBackButton.classList.contains('hidden') ? 'list' : 'chat');
+                
+                // Change icon to chevron up (to indicate it can be collapsed)
+                collapseIcon.innerHTML = `<path d="m18 15-6-6-6 6"/>`;
+                chatCollapseButton.title = 'Collapse Chat';
+            }
+
+            // Re-render icons if Lucide is available
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+        }
+
+
+        /**
+         * Toggles the chat widget between its default size and a maximized size (center modal).
+         */
+        function toggleChatMaximized() {
+            if (!chatWidget || !zoomedChatHost || !sidebarChatParent || !zoomIcon || !chatZoomButton || !chatCollapseButton || !chatNewButton || !chatBody || !activeChatContent) {
+                console.error("Chat elements not initialized for maximize function.");
+                return;
+            }
+            
+            isChatMaximized = !isChatMaximized;
+            
+            if (isChatMaximized) {
+                // MAXIMIZED (ZOOMED)
+                
+                // 1. Move chat widget to the center host (Modal view)
+                zoomedChatHost.classList.remove('hidden');
+                zoomedChatHost.insertBefore(chatWidget, zoomedChatHost.firstChild);
+
+                // 2. Apply centered modal styling to chat widget
+                chatWidget.classList.remove('h-fit', 'w-full', 'border'); 
+                chatBody.classList.remove('hidden', 'max-h-60');
+                activeChatContent.classList.remove('hidden');
+                
+                // Set the modal size
+                chatWidget.classList.add('w-full', 'max-w-lg', 'h-[70vh]', 'rounded-xl', 'border-4', 'overflow-hidden'); 
+                
+                // 3. Update icon to minimize (Shrink)
+                zoomIcon.innerHTML = `<path d="M15 3h3a2 2 0 0 1 2 2v3m-5 13h-3a2 2 0 0 1-2-2v-3m13-3v-3a2 2 0 0 1-2-2h-3M3 15v3a2 2 0 0 0 2 2h3"/>`;
+                chatZoomButton.title = 'Minimize Chat';
+                
+                // 4. Ensure body/content grows inside the modal
+                chatBody.classList.add('flex-grow', 'overflow-y-auto');
+                activeChatContent.style.flexGrow = 1;
+                activeChatContent.style.height = '100%';
+                
+                // 5. Hide collapse button and show the new chat button when maximized
+                chatCollapseButton.classList.add('hidden');
+                chatNewButton.classList.remove('hidden');
+
+            } else {
+                // MINIMIZED (Returning to sidebar)
+
+                // 1. Move chat widget back to the sidebar
+                sidebarChatParent.insertBefore(chatWidget, sidebarChatParent.firstChild);
+                zoomedChatHost.classList.add('hidden');
+
+                // 2. Remove centered modal styling
+                chatWidget.classList.add('h-fit', 'w-full', 'border');
+                chatWidget.classList.remove('w-full', 'max-w-lg', 'h-[70vh]', 'rounded-xl', 'border-4', 'overflow-hidden', 'flex-grow');
+                
+                // 3. Update icon back to maximize (Expand)
+                zoomIcon.innerHTML = `<path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>`;
+                chatZoomButton.title = 'Maximize Chat';
+                
+                // 4. Restore sidebar sizing and collapse state
+                chatBody.classList.remove('flex-grow', 'overflow-y-auto');
+                activeChatContent.style.flexGrow = 0;
+                
+                // Force chat to expanded view when returning from modal
+                isChatCollapsed = false; 
+                
+                // 5. Show collapse button again and hide new chat button
+                chatCollapseButton.classList.remove('hidden');
+                chatNewButton.classList.add('hidden');
+                
+                // Restore expanded view (which is the default list view)
+                setChatView(chatBackButton.classList.contains('hidden') ? 'list' : 'chat');
+                chatBody.classList.add('max-h-60');
+                
+                // Update collapse icon to 'up' to show it's currently expanded
+                collapseIcon.innerHTML = `<path d="m18 15-6-6-6 6"/>`;
+                chatCollapseButton.title = 'Collapse Chat';
+            }
+
+            // Re-render icons to ensure they look correct
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+        }
+
+        /**
+         * Placeholder function for the new chat/select branch action
+         */
+        function handleNewChat() {
+            console.log("New Chat / Select Branch feature triggered!");
+        }
+
+
+        /**
+         * Updates the date and time display in the sidebar.
+         */
+        function updateDateTime() {
+            const now = new Date();
+            
+            // Shortened, more compact date format (e.g., Mon, Nov 3)
+            const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+            const dateString = now.toLocaleDateString('en-US', dateOptions);
+
+            // Time format (e.g., 11:50 AM) - removing seconds for less clutter
+            const timeOptions = { hour: 'numeric', minute: '2-digit', hour12: true };
+            const timeString = now.toLocaleTimeString('en-US', timeOptions);
+
+            const displayElement = document.getElementById('datetime-display');
+            if (displayElement) {
+                // Combined into one line with a separator - INCREASED text size to text-lg
+                displayElement.innerHTML = `
+                    <p class="text-lg font-medium">${dateString} <span class="mx-1 opacity-50">|</span> ${timeString}</p>
+                `;
+            }
+        }
+
+
+        // Initialization function to run when the DOM is fully loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // 1. Assign Element Variables inside the DOM ready handler
+            sidebar = document.getElementById('sidebar');
+            iconsSection = document.getElementById('icons-section');
+            backdrop = document.getElementById('backdrop');
+            chatWidget = document.getElementById('chat-widget');
+            chatTitle = document.getElementById('chat-title');
+            chatBody = document.getElementById('chat-body');
+            activeChatContent = document.getElementById('active-chat-content');
+            chatBackButton = document.getElementById('chat-back-button');
+            chatNotifBubble = document.getElementById('chat-notification-bubble');
+            zoomIcon = document.getElementById('zoom-icon');
+            collapseIcon = document.getElementById('collapse-icon');
+            chatCollapseButton = document.getElementById('chat-collapse-button');
+            chatNewButton = document.getElementById('chat-new-button');
+            chatZoomButton = document.getElementById('chat-zoom-button'); 
+            nonChatContent = document.getElementById('non-chat-content'); 
+            zoomedChatHost = document.getElementById('zoomed-chat-host');
+            sidebarChatParent = document.getElementById('sidebar-chat-parent'); 
+
+            // 2. ATTACH EVENT LISTENERS
+            
+            if (chatZoomButton) {
+                chatZoomButton.addEventListener('click', toggleChatMaximized);
+            } else {
+                console.error("Element chat-zoom-button not found for event listener.");
+            }
+            
+            if (chatCollapseButton) {
+                chatCollapseButton.addEventListener('click', toggleChatCollapse);
+            } else {
+                console.error("Element chat-collapse-button not found for event listener.");
+            }
+
+
+            // 3. Initialize Lucide icons (check if available)
+            if (typeof lucide !== 'undefined' && lucide.createIcons) {
+                lucide.createIcons();
+            }
+            
+            // 4. Set initial date/time and start the clock interval
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+        });

@@ -8,7 +8,7 @@ CREATE TABLE Branches (
     BranchName VARCHAR(100) NOT NULL,
     BranchAddress VARCHAR(255),
     BranchCode VARCHAR(10) UNIQUE NOT NULL
-);
+)ENGINE=InnoDB;
 
 -- Table 2: Accounts (Correct)
 CREATE TABLE Accounts (
@@ -24,7 +24,7 @@ CREATE TABLE Accounts (
     DateCreated DATETIME DEFAULT CURRENT_TIMESTAMP,
     LastLogin DATETIME,
     FOREIGN KEY (BranchID) REFERENCES Branches(BranchID)
-);
+)ENGINE=InnoDB;
 
 -- Table 3: Details (Correct)
 CREATE TABLE Details (
@@ -41,7 +41,19 @@ CREATE TABLE Details (
     NationalIDNumber VARCHAR(30) UNIQUE,
     LastUpdated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID)
-);
+)ENGINE=InnoDB;
+
+-- Table 3B: OTP Verification (For Password Reset)
+CREATE TABLE OTPVerification (
+    OTPID INT PRIMARY KEY AUTO_INCREMENT,
+    UserID INT NOT NULL,
+    OTPCode VARCHAR(6) NOT NULL,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ExpiresAt DATETIME NOT NULL,
+    IsUsed TINYINT(1) DEFAULT 0,
+    AttemptCount INT DEFAULT 0,
+    FOREIGN KEY (UserID) REFERENCES Accounts(UserID) ON DELETE CASCADE
+)ENGINE=InnoDB;
 
 -- Table 4: medicines (Correct)
 
@@ -53,7 +65,7 @@ CREATE TABLE medicines (
     Form ENUM('Pill/Tablet', 'Liquid', 'Cream/Gel/Ointment', 'Inhaler', 'Injection', 'Patch', 'Drops'),
     Unit VARCHAR(20),
     FOREIGN KEY (CategoryID) REFERENCES Categories(CategoryID)
-);
+)ENGINE=InnoDB;
 
 
 -- Table 5: BranchInventory (Correct)
@@ -70,7 +82,7 @@ CREATE TABLE BranchInventory (
     FOREIGN KEY (BranchID) REFERENCES Branches(BranchID),
     FOREIGN KEY (MedicineID) REFERENCES medicines(MedicineID),
     UNIQUE KEY idx_branch_med (BranchID, MedicineID) 
-);
+)ENGINE=InnoDB;
 
 -- Table 6: Transactions (POS Receipt Header)
 CREATE TABLE SalesTransactions (
@@ -83,7 +95,7 @@ CREATE TABLE SalesTransactions (
     CustomerName VARCHAR(100),
     FOREIGN KEY (BranchID) REFERENCES Branches(BranchID),
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID)
-);
+)ENGINE=InnoDB;
 
 -- Table 7: TransactionItems (POS Receipt Details)
 CREATE TABLE TransactionItems (
@@ -96,14 +108,14 @@ CREATE TABLE TransactionItems (
     Subtotal DECIMAL(10, 2) NOT NULL,
     FOREIGN KEY (TransactionID) REFERENCES SalesTransactions(TransactionID) ON DELETE CASCADE,
     FOREIGN KEY (BranchInventoryID) REFERENCES BranchInventory(BranchInventoryID) ON DELETE CASCADE
-);
+)ENGINE=InnoDB;
 
 -- Table 8: ChatConversations (Correct)
 CREATE TABLE ChatConversations (
     ConversationID INT PRIMARY KEY AUTO_INCREMENT,
     LastMessageTimestamp DATETIME,
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+)ENGINE=InnoDB;
 
 -- Table 9: ChatParticipants (Updated)
 CREATE TABLE ChatParticipants ( 
@@ -116,7 +128,7 @@ CREATE TABLE ChatParticipants (
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID) ON DELETE CASCADE,
     FOREIGN KEY (BranchID) REFERENCES Branches(BranchID) ON DELETE CASCADE,
     UNIQUE KEY (ConversationID, UserID) 
-);
+)ENGINE=InnoDB;
 
 -- Table 10: ChatMessages (Updated)
 CREATE TABLE ChatMessages (
@@ -130,22 +142,100 @@ CREATE TABLE ChatMessages (
     FOREIGN KEY (ConversationID) REFERENCES ChatConversations(ConversationID) ON DELETE CASCADE,
     FOREIGN KEY (SenderUserID) REFERENCES Accounts(UserID) ON DELETE CASCADE,
     FOREIGN KEY (BranchID) REFERENCES Branches(BranchID) ON DELETE CASCADE
-);
--- Table 11: Notifications (Correct)
-CREATE TABLE IF NOT EXISTS Notifications (
-    NotificationID INT PRIMARY KEY AUTO_INCREMENT,
-    UserID INT NOT NULL,
-    Type ENUM('alert', 'chat', 'info', 'warning', 'error') DEFAULT 'info',
+)ENGINE=InnoDB;
+
+-- *******************************************************************
+-- Notifications Table for Bell Notification System
+-- *******************************************************************
+
+CREATE TABLE Notifications (
+    NotificationID INT AUTO_INCREMENT PRIMARY KEY,
+    UserID INT NULL,
+    BranchID INT NOT NULL,
+
+    Type ENUM(
+        'inventory',
+        'med',
+        'chat',
+        'pos',
+        'reports',
+        'account',
+        'system'
+    ) NOT NULL,
+
+    Category ENUM(
+        'Low Stock',
+        'Out of Stock',
+        'Expiring Soon',
+        'Expired',
+        'Add',
+        'Edit',
+        'Delete',
+        'Message',
+        'Sale',
+        'Report',
+        'Profile',
+        'Other'
+    ) NULL,
+
     Title VARCHAR(255) NOT NULL,
-    Message TEXT,
-    Link VARCHAR(500),
-    IsRead TINYINT DEFAULT 0,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ReadAt DATETIME NULL,
-    FOREIGN KEY (UserID) REFERENCES Accounts(UserID) ON DELETE CASCADE,
-    INDEX idx_user_unread (UserID, IsRead),
-    INDEX idx_created (CreatedAt)
-);
+    Message TEXT NOT NULL,
+    Link VARCHAR(255),
+    ResourceType VARCHAR(50),
+    ResourceID INT,
+    Severity ENUM('info','success','warning','error') NOT NULL DEFAULT 'info',
+    IsRead TINYINT(1) NOT NULL DEFAULT 0,
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UpdatedAt TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+
+    INDEX idx_user_isread (UserID, IsRead, CreatedAt),
+    INDEX idx_branch_created (BranchID, CreatedAt),
+    INDEX idx_type_category (Type, Category, CreatedAt),
+    INDEX idx_resource (ResourceType, ResourceID),
+
+    FOREIGN KEY (BranchID) REFERENCES Branches(BranchID),
+    FOREIGN KEY (UserID) REFERENCES Accounts(UserID)
+) ENGINE=InnoDB;
+
+-- NotificationReadState:
+CREATE TABLE NotificationReadState (
+    ReadID INT AUTO_INCREMENT PRIMARY KEY,
+    NotificationID INT NOT NULL,
+    UserID INT NOT NULL,
+    IsRead TINYINT(1) NOT NULL DEFAULT 0,
+    ReadAt TIMESTAMP NULL DEFAULT NULL,
+
+    UNIQUE KEY uniq_notification_user (NotificationID, UserID),
+    INDEX idx_user_isread (UserID, IsRead),
+
+    FOREIGN KEY (NotificationID) REFERENCES Notifications(NotificationID) ON DELETE CASCADE,
+    FOREIGN KEY (UserID) REFERENCES Accounts(UserID)
+) ENGINE=InnoDB;
+
+--CalendarNotes table:
+CREATE TABLE CalendarNotes (
+    NoteID INT AUTO_INCREMENT PRIMARY KEY,
+    UserID INT NOT NULL,
+    BranchID INT NOT NULL,
+    NoteDate DATE NOT NULL,
+    NoteText TEXT,
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (UserID) REFERENCES Accounts(UserID),
+    FOREIGN KEY (BranchID) REFERENCES Branches(BranchID)
+)ENGINE=InnoDB;
+
+-- ToDoList table:
+CREATE TABLE ToDoList (
+        TaskID INT AUTO_INCREMENT PRIMARY KEY,
+        UserID INT NOT NULL,
+        BranchID INT NOT NULL,
+        TaskText VARCHAR(255) NOT NULL,
+        IsDone TINYINT(1) DEFAULT 0,
+        CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (UserID) REFERENCES Accounts(UserID),
+        FOREIGN KEY (BranchID) REFERENCES Branches(BranchID)
+)ENGINE=InnoDB;
+
 
 --Remove this if you encounter error
 ALTER TABLE ChatMessages
@@ -164,30 +254,31 @@ INSERT INTO Branches (BranchName, BranchCode) VALUES
 ('Sto Tomas Branch', 'B002'),  -- BranchID 2
 ('Malvar Branch', 'B003');     -- BranchID 3
 
+
 -- USER ACCOUNTS
 -- A. ADMIN USER (Branch 1)
 INSERT INTO Accounts (BranchID, UserCode, FirstName, LastName, Email, HashedPassword, Role)
-VALUES (1, 'ADMIN1B1', 'Ralph Lauren', 'Bautista', 'ralphlauren.c@branch1.com', '$2y$10$9AS0DvJJKbbMofAA4nSusOC9bJf5GWQSMX34R4MaW4aEA5iSPxhJu', 'Admin');
-INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalAddress, HireDate, Position, Salary, NationalIDNumber)
-VALUES (LAST_INSERT_ID(), '1985-04-10', 'Male', '101 Maple Ave, Branch 1 Lipa City', '2018-08-01', 'Administrator', 95000.00, '12345678901');
+VALUES (1, 'ADMIN1B1', 'Ralph Lauren', 'Bautista', 'bautistastudentacc@gmail.com', '$2y$10$b3XJ2UTkPSS28yiJo.7YFOk3BbLZ8MZeqzcreHpCqdGqbdh9H6veG', 'Admin');
+INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalPhoneNumber, PersonalAddress, EmergencyContactName, EmergencyContactPhone, HireDate, Position, Salary, NationalIDNumber)
+VALUES (LAST_INSERT_ID(), '1985-04-10', 'Male', '09493298133', '101 Maple Ave, Branch 1 Lipa City', 'Ziyu', '09123456789', '2018-08-01', 'Administrator', 95000.00, '12345678901');
 
 -- B. STAFF 1, BRANCH 1 (Lipa)
 INSERT INTO Accounts (BranchID, UserCode, FirstName, LastName, Email, HashedPassword, Role)
-VALUES (1, 'STAFF1B1', 'Erryca', 'Hizon', 'Erryka.s@branch1.com', '$2y$10$3nLdC.EivbE2d5kQrjLwA.xY8Q1gGZqJkQ.U.p5fE.jB/zG.9i5.S', 'Staff');
-INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalAddress, HireDate, Position, Salary, NationalIDNumber)
-VALUES (LAST_INSERT_ID(), '1992-11-20', 'Female', '202 Oak St, Branch 1 Lipa City', '2022-05-15', 'staff',48000.00, '23456789012');
+VALUES (1, 'STAFF1B1', 'Erryca', 'Hizon', 'abistadoerryca@gmail.com', '$2y$10$b3XJ2UTkPSS28yiJo.7YFOk3BbLZ8MZeqzcreHpCqdGqbdh9H6veG', 'Staff');
+INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalPhoneNumber, PersonalAddress, EmergencyContactName, EmergencyContactPhone, HireDate, Position, Salary, NationalIDNumber)
+VALUES (LAST_INSERT_ID(), '1992-11-20', 'Female', '09509002527', '202 Oak St, Branch 1 Lipa City', 'Zamburat', '09123456789', '2022-05-15', 'staff',48000.00, '23456789012');
 
 -- C. STAFF 1, BRANCH 2 (Sto Tomas)
 INSERT INTO Accounts (BranchID, UserCode, FirstName, LastName, Email, HashedPassword, Role)
-VALUES (2, 'STAFF1B2', 'Abby', 'Balambing', 'Abby.b@branch2.com', '$2y$10$74zp2nK24lOJwOU34MWkkONlGkxVngSAvz11patXElwClOBpmNJM.', 'Staff');
-INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalAddress, HireDate, Position, Salary, NationalIDNumber)
-VALUES (LAST_INSERT_ID(), '1998-07-05', 'Female', '303 Pine Lane, Branch 2 Sto Tomas City', '2023-01-20', 'Staff', 45000.00, '34567890123');
+VALUES (2, 'STAFF1B2', 'Abby', 'Balambing', 'Abby.b@branch2.com', '$2y$10$b3XJ2UTkPSS28yiJo.7YFOk3BbLZ8MZeqzcreHpCqdGqbdh9H6veG', 'Staff');
+INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalPhoneNumber, PersonalAddress, EmergencyContactName, EmergencyContactPhone, HireDate,  Position, Salary, NationalIDNumber)
+VALUES (LAST_INSERT_ID(), '1998-07-05', 'Female', '09493298133', '303 Pine Lane, Branch 2 Sto Tomas City','Mamita delarosa', '099762354278', '2023-01-20', 'Staff', 45000.00, '34567890123');
 
 -- D. STAFF 1, BRANCH 3 (Malvar)
 INSERT INTO Accounts (BranchID, UserCode, FirstName, LastName, Email, HashedPassword, Role)
-VALUES (3, 'STAFF1B3', 'Sopphie', 'Pasta', 'sophie.p@branch3.com', '$2y$10$Pbzgvao7eCkl55c8W2liB.0Tp5e4UIbGIdzPvfYzX8a9T3Iy1OS32', 'Staff');
-INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalAddress, HireDate, Position, Salary, NationalIDNumber)
-VALUES (LAST_INSERT_ID(), '1990-03-28', 'Female', '404 Cedar St, Branch 3 Malvar City(soon)', '2020-10-10', 'Staff', 55000.00, '45678901234');
+VALUES (3, 'STAFF1B3', 'Sopphie', 'Pasta', 'sophie.p@branch3.com', '$2y$10$b3XJ2UTkPSS28yiJo.7YFOk3BbLZ8MZeqzcreHpCqdGqbdh9H6veG', 'Staff');
+INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalPhoneNumber, PersonalAddress, EmergencyContactName, EmergencyContactPhone, HireDate, Position, Salary, NationalIDNumber)
+VALUES (LAST_INSERT_ID(), '1990-03-28', 'Female', '+63920456789', '404 Cedar St, Branch 3 Malvar City(soon)','Zamburat', '09889162534', '2020-10-10', 'Staff', 55000.00, '45678901234');
 
 -- ***************************************************************
 -- 1. INSERT 50 UNIQUE MEDICINES (Updating the global catalog)
@@ -858,21 +949,3 @@ ADD FOREIGN KEY (UpdatedBy) REFERENCES Accounts(UserID);
 ALTER TABLE SalesTransactions 
 ADD COLUMN UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
--- *******************************************************************
--- Notifications Table for Bell Notification System
--- *******************************************************************
-
-CREATE TABLE IF NOT EXISTS Notifications (
-    NotificationID INT PRIMARY KEY AUTO_INCREMENT,
-    UserID INT NOT NULL,
-    Type ENUM('alert', 'chat', 'info', 'warning', 'error') DEFAULT 'info',
-    Title VARCHAR(255) NOT NULL,
-    Message TEXT,
-    Link VARCHAR(500),
-    IsRead TINYINT DEFAULT 0,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-    ReadAt DATETIME NULL,
-    FOREIGN KEY (UserID) REFERENCES Accounts(UserID) ON DELETE CASCADE,
-    INDEX idx_user_unread (UserID, IsRead),
-    INDEX idx_created (CreatedAt)
-);

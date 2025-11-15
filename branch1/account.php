@@ -51,9 +51,70 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
 
 require_once '../dbconnection.php';
 
+$flash_success = [];
+$flash_error = [];
+
 try {
     $db = new Database();
     $pdo = $db->getConnection();
+
+    // Handle form submissions: update details or change password
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+        $action = $_POST['action'];
+
+        if ($action === 'update_details') {
+            $personal_phone = trim($_POST['personal_phone'] ?? '');
+            $gender_in = trim($_POST['gender'] ?? '');
+            $personal_address_in = trim($_POST['personal_address'] ?? '');
+            $emergency_name_in = trim($_POST['emergency_name'] ?? '');
+            $emergency_phone_in = trim($_POST['emergency_phone'] ?? '');
+
+            // Basic validation
+            if (strlen($personal_phone) > 50) {
+                $flash_error[] = 'Personal phone is too long.';
+            }
+            if (strlen($personal_address_in) > 255) {
+                $flash_error[] = 'Address is too long.';
+            }
+
+            if (empty($flash_error)) {
+                $update = $pdo->prepare(
+                    "UPDATE Details SET PersonalPhoneNumber = ?, Gender = ?, PersonalAddress = ?, EmergencyContactName = ?, EmergencyContactPhone = ? WHERE UserID = ?"
+                );
+                $update->execute([$personal_phone, $gender_in, $personal_address_in, $emergency_name_in, $emergency_phone_in, $user_id]);
+                $flash_success[] = 'Personal details updated successfully.';
+            }
+        }
+
+        if ($action === 'change_password') {
+            $current_password = $_POST['current_password'] ?? '';
+            $new_password = $_POST['new_password'] ?? '';
+            $confirm_password = $_POST['confirm_password'] ?? '';
+
+            if (empty($current_password) || empty($new_password) || empty($confirm_password)) {
+                $flash_error[] = 'Please fill out all password fields.';
+            } elseif ($new_password !== $confirm_password) {
+                $flash_error[] = 'New password and confirmation do not match.';
+            } elseif (strlen($new_password) < 8) {
+                $flash_error[] = 'New password must be at least 8 characters.';
+            } else {
+                // Fetch current hashed password
+                $stmtPwd = $pdo->prepare("SELECT HashedPassword FROM Accounts WHERE UserID = ?");
+                $stmtPwd->execute([$user_id]);
+                $row = $stmtPwd->fetch(PDO::FETCH_ASSOC);
+                $hashed = $row['HashedPassword'] ?? '';
+
+                if (!password_verify($current_password, $hashed)) {
+                    $flash_error[] = 'Current password is incorrect.';
+                } else {
+                    $new_hashed = password_hash($new_password, PASSWORD_BCRYPT);
+                    $upd = $pdo->prepare("UPDATE Accounts SET HashedPassword = ? WHERE UserID = ?");
+                    $upd->execute([$new_hashed, $user_id]);
+                    $flash_success[] = 'Password changed successfully.';
+                }
+            }
+        }
+    }
 
     // Fetch user account details
     $stmt = $pdo->prepare("SELECT Email, DateCreated, LastLogin FROM Accounts WHERE UserID = ?");
@@ -148,12 +209,8 @@ try {
 
             <!-- Icons Section -->
             <div id="icons-section" class="flex items-center space-x-4">
-                <!-- Bell Icon (Notification) -->
-                <button id="notification-bell-btn" aria-label="Notifications" class="p-2 hover:bg-slate-700 rounded-full transition duration-150 relative">
-                    <svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.375 22a2 2 0 0 0 3.25 0"/></svg>
-                </button>
-                <?php include __DIR__ . '/includes/notification_dropdown.php'; ?>
-                <!-- Hamburger Menu Icon (OPEN BUTTON) -->
+                <?php include __DIR__ . '/includes/notification_bell.php'; ?>
+                                                                <!-- Hamburger Menu Icon (OPEN BUTTON) -->
                 <!-- Calls toggleSidebar() -->
                 <button id="open-sidebar-btn" aria-label="Menu" onclick="toggleSidebar()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition duration-150">
                     <svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
@@ -189,6 +246,18 @@ try {
                 <p class="text-gray-600 text-lg mb-8">
                     Welcome, <?php echo $user_full_name; ?>. Ready to manage your account and view today's essential insights for <?php echo $branch_name; ?>.
                 </p>
+
+                <!-- Flash messages -->
+                <?php if (!empty($flash_success) || !empty($flash_error)): ?>
+                    <div class="mb-6">
+                        <?php foreach ($flash_success as $msg): ?>
+                            <div class="bg-green-50 border-l-4 border-green-400 p-4 mb-2 text-sm text-green-800"><?php echo htmlspecialchars($msg); ?></div>
+                        <?php endforeach; ?>
+                        <?php foreach ($flash_error as $msg): ?>
+                            <div class="bg-red-50 border-l-4 border-red-400 p-4 mb-2 text-sm text-red-800"><?php echo htmlspecialchars($msg); ?></div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
 
                 <!-- Dashboard Content based on requirements -->
                 <div class="space-y-8">
@@ -366,9 +435,26 @@ try {
                                     <div class="bg-indigo-50 p-6 rounded-lg border border-indigo-200">
                                         <h5 class="text-lg font-semibold mb-2">Change Password</h5>
                                         <p class="text-sm text-gray-600 mb-4">Update your account password frequently to ensure security.</p>
-                                        <button class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
-                                            <i data-lucide="lock" class="w-4 h-4 inline-block mr-2"></i> Update Password
-                                        </button>
+                                        <form method="post" class="space-y-3">
+                                            <input type="hidden" name="action" value="change_password">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Current Password</label>
+                                                <input type="password" name="current_password" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">New Password</label>
+                                                <input type="password" name="new_password" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Confirm New Password</label>
+                                                <input type="password" name="confirm_password" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
+                                            </div>
+                                            <div class="text-right">
+                                                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
+                                                    <i data-lucide="lock" class="w-4 h-4 inline-block mr-2"></i> Update Password
+                                                </button>
+                                            </div>
+                                        </form>
                                     </div>
 
                                     <!-- Two-Factor Authentication -->
@@ -405,22 +491,31 @@ try {
                                     <!-- Editable Details Form -->
                                     <div class="bg-gray-50 p-6 rounded-lg border">
                                         <h5 class="font-semibold text-lg mb-4 text-indigo-700">Personal Contact Information</h5>
-                                        <form class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <input type="hidden" name="action" value="update_details">
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700">Personal Phone Number</label>
-                                                <input type="text" value="<?php echo $personal_phone; ?>" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
+                                                <input type="text" name="personal_phone" value="<?php echo htmlspecialchars($personal_phone ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
                                             </div>
                                             <div>
                                                 <label class="block text-sm font-medium text-gray-700">Gender</label>
-                                                <select class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
-                                                    <option <?php echo ($gender === 'Male') ? 'selected' : ''; ?>>Male</option>
-                                                    <option <?php echo ($gender === 'Female') ? 'selected' : ''; ?>>Female</option>
-                                                    <option <?php echo ($gender === 'Other') ? 'selected' : ''; ?>>Other</option>
+                                                <select name="gender" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
+                                                    <option value="Male" <?php echo ($gender === 'Male') ? 'selected' : ''; ?>>Male</option>
+                                                    <option value="Female" <?php echo ($gender === 'Female') ? 'selected' : ''; ?>>Female</option>
+                                                    <option value="Other" <?php echo ($gender === 'Other') ? 'selected' : ''; ?>>Other</option>
                                                 </select>
                                             </div>
                                             <div class="md:col-span-2">
                                                 <label class="block text-sm font-medium text-gray-700">Residential Address</label>
-                                                <input type="text" value="<?php echo $personal_address; ?>" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
+                                                <input type="text" name="personal_address" value="<?php echo htmlspecialchars($personal_address ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Emergency Contact Name</label>
+                                                <input type="text" name="emergency_name" value="<?php echo htmlspecialchars($emergency_name ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
+                                            </div>
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700">Emergency Contact Phone</label>
+                                                <input type="text" name="emergency_phone" value="<?php echo htmlspecialchars($emergency_phone ?? ''); ?>" class="mt-1 block w-full border border-gray-300 rounded-lg shadow-sm p-2">
                                             </div>
                                             <div class="md:col-span-2 text-right">
                                                 <button type="submit" class="px-5 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition">Save Changes</button>
@@ -660,7 +755,7 @@ try {
     
     <!-- Combined JavaScript Logic (from script.js and inline functions) -->
     <script src="js/chat.js?v=<?php echo time(); ?>"></script>
-    <script src="js/notifications.js?v=<?php echo time(); ?>" defer></script>
-    <script src="js/script.js"></script>
+        <script src="js/notifications_bell.js" defer></script>
+        <script src="js/script.js"></script>
 </body>
 </html>

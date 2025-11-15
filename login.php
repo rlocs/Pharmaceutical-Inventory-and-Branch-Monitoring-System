@@ -10,6 +10,11 @@ if (isset($_SESSION['login_alert'])) {
     unset($_SESSION['login_alert']);
 }
 
+// Check for password reset success
+if (isset($_GET['reset']) && $_GET['reset'] === 'success') {
+    $login_alert = '✅ Password reset successfully! Please login with your new password.';
+}
+
 // Always reset the login state *after* capturing the alert.
 // This ensures that visiting the login page is a clean start and prevents redirect loops.
 if (isset($_SESSION['loggedin'])) {
@@ -48,7 +53,7 @@ if (isset($_SESSION['loggedin'])) {
             align-items: center;
             height: 100vh;
             margin: 0;
-            background-color: rgb(255, 255, 255);
+            background: linear-gradient(135deg, #0f438bff 0%, #cfcfcfff 100%);
         }
 
         .container {
