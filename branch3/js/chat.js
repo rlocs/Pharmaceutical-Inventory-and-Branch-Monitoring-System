@@ -5,7 +5,7 @@
 */
 
 (function () {
-    const apiBase = './api/chat_api.php';
+    const apiBase = 'api/chat_api.php';
     const currentUserId = Number(window.currentUserId || 0);
 
     // DOM Elements
@@ -798,7 +798,7 @@
     */
     function updateChatBadge() {
         // notifications summary endpoint
-        fetch('./api/notifications.php?action=summary', { credentials: 'same-origin' })
+        fetch('api/notifications.php?action=summary', { credentials: 'same-origin' })
             .then(r => r.json())
             .then(data => {
                 if (!data || !data.success) return;

@@ -161,8 +161,7 @@ function escapeHtml($text) {
     </script>
     <script src="js/alerts.js?v=<?php echo time(); ?>" defer></script>
     <script src="js/medicine.js?v=<?php echo time(); ?>" defer></script>
-    <script src="js/notifications.js?v=<?php echo time(); ?>" defer></script>
-
+    
 
     <!-- Custom CSS Styles are in css/style.css -->
 </head>
@@ -187,12 +186,8 @@ function escapeHtml($text) {
 
             <!-- Icons Section -->
             <div id="icons-section" class="flex items-center space-x-4">
-                <!-- Bell Icon (Notification) -->
-                <button id="notification-bell-btn" aria-label="Notifications" class="p-2 hover:bg-slate-700 rounded-full transition duration-150 relative">
-                    <svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.375 22a2 2 0 0 0 3.25 0"/></svg>
-                </button>
-                <?php include __DIR__ . '/includes/notification_dropdown.php'; ?>
-                <!-- Hamburger Menu Icon (OPEN BUTTON) -->
+                <?php include __DIR__ . '/includes/notification_bell.php'; ?>
+                                                                <!-- Hamburger Menu Icon (OPEN BUTTON) -->
                 <!-- Calls toggleSidebar() -->
                 <button id="open-sidebar-btn" aria-label="Menu" onclick="toggleSidebar()" class="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition duration-150">
                     <svg class="lucide" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
@@ -546,6 +541,7 @@ function escapeHtml($text) {
 
     <!-- Combined JavaScript Logic -->
     <script src="js/chat.js?v=<?php echo time(); ?>"></script>
+    <script src="js/notifications_bell.js" defer></script>
     <script src="js/script.js"></script>
 
 

@@ -10,6 +10,31 @@ function send_response($data) {
     exit;
 }
 
+// --- Helper function to create notifications for chat messages ---
+function createNotification($conn, $type, $category, $title, $message, $link = '', $userId = null) {
+    try {
+        if ($userId === null) {
+            $userId = $_SESSION['user_id'] ?? null;
+        }
+        $branchId = $_SESSION['branch_id'] ?? 1;
+        // Try to get recipient's branch if we have a user_id (they might be in different branch)
+        if ($userId) {
+            $b = $conn->prepare("SELECT BranchID FROM Accounts WHERE UserID = ? LIMIT 1");
+            $b->execute([$userId]);
+            $r = $b->fetch(PDO::FETCH_ASSOC);
+            if ($r) $branchId = $r['BranchID'];
+        }
+
+        $stmt = $conn->prepare("INSERT INTO Notifications (UserID, BranchID, Type, Category, Title, Message, Link, IsRead) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
+        $stmt->execute([$userId, $branchId, $type, $category, $title, $message, $link]);
+        $nid = (int)$conn->lastInsertId();
+        return $nid > 0 ? $nid : false;
+    } catch (Exception $e) {
+        error_log("Notification creation failed: " . $e->getMessage());
+        return false;
+    }
+}
+
 // --- Ensure user is logged in ---
 if (!isset($_SESSION['loggedin']) || !isset($_SESSION['user_id'])) {
     send_response(['success' => false, 'error' => 'Authentication required.']);
@@ -27,74 +52,92 @@ try {
 
 $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
+// For this environment we will use direct SQL queries instead of stored procedures.
 switch ($action) {
-    // --- Get all conversations for the current user ---
     case 'get_conversations':
         try {
-            $stmt = $conn->prepare("CALL SP_GetConversations(:p_UserID)");
-            $stmt->bindParam(':p_UserID', $current_user_id, PDO::PARAM_INT);
+            $stmt = $conn->prepare("CALL SP_GetConversations(:user_id)");
+            $stmt->bindParam(':user_id', $current_user_id, PDO::PARAM_INT);
             $stmt->execute();
             $conversations = $stmt->fetchAll(PDO::FETCH_ASSOC);
             send_response(['success' => true, 'conversations' => $conversations]);
         } catch (PDOException $e) {
-            error_log("SP_GetConversations error: " . $e->getMessage());
+            error_log("Get conversations error: " . $e->getMessage());
             send_response(['success' => false, 'error' => 'Failed to fetch conversations.']);
         }
         break;
 
-    // --- Get all messages for a specific conversation ---
     case 'get_messages':
-        $conversation_id = $_GET['conversation_id'] ?? 0;
+        $conversation_id = $_GET['conversation_id'] ?? ($_POST['conversation_id'] ?? 0);
         if (empty($conversation_id)) {
             send_response(['success' => false, 'error' => 'Conversation ID is required.']);
         }
 
         try {
-            // First, update the last read timestamp for the user in this conversation
-            $updateStmt = $conn->prepare("CALL SP_UpdateLastRead(:p_ConversationID, :p_UserID)");
-            $updateStmt->bindParam(':p_ConversationID', $conversation_id, PDO::PARAM_INT);
-            $updateStmt->bindParam(':p_UserID', $current_user_id, PDO::PARAM_INT);
-            $updateStmt->execute();
+            // Update last read timestamp for this participant
+            $update = $conn->prepare("CALL SP_UpdateLastRead(:conv, :uid)");
+            $update->bindParam(':conv', $conversation_id, PDO::PARAM_INT);
+            $update->bindParam(':uid', $current_user_id, PDO::PARAM_INT);
+            $update->execute();
 
-            // Then, fetch the messages
-            $stmt = $conn->prepare("CALL SP_GetMessages(:p_ConversationID)");
-            $stmt->bindParam(':p_ConversationID', $conversation_id, PDO::PARAM_INT);
+            // Fetch messages
+            $stmt = $conn->prepare("CALL SP_GetMessages(:conv)");
+            $stmt->bindParam(':conv', $conversation_id, PDO::PARAM_INT);
             $stmt->execute();
             $messages = $stmt->fetchAll(PDO::FETCH_ASSOC);
             send_response(['success' => true, 'messages' => $messages]);
         } catch (PDOException $e) {
-            error_log("SP_GetMessages error: " . $e->getMessage());
+            error_log("Get messages error: " . $e->getMessage());
             send_response(['success' => false, 'error' => 'Failed to fetch messages.']);
         }
         break;
 
-    // --- Send a new message ---
     case 'send_message':
         $conversation_id = $_POST['conversation_id'] ?? 0;
         $message_content = trim($_POST['message'] ?? '');
 
-        if (empty($conversation_id) || empty($message_content)) {
+        if (empty($conversation_id) || $message_content === '') {
             send_response(['success' => false, 'error' => 'Conversation ID and message content are required.']);
         }
 
         try {
-            $stmt = $conn->prepare("CALL SP_SendMessage(:p_ConversationID, :p_SenderUserID, :p_MessageContent)");
-            $stmt->bindParam(':p_ConversationID', $conversation_id, PDO::PARAM_INT);
-            $stmt->bindParam(':p_SenderUserID', $current_user_id, PDO::PARAM_INT);
-            $stmt->bindParam(':p_MessageContent', $message_content, PDO::PARAM_STR);
+            $stmt = $conn->prepare("CALL SP_SendMessage(:conv, :sender, :msg)");
+            $stmt->bindParam(':conv', $conversation_id, PDO::PARAM_INT);
+            $stmt->bindParam(':sender', $current_user_id, PDO::PARAM_INT);
+            $stmt->bindParam(':msg', $message_content, PDO::PARAM_STR);
             $stmt->execute();
-            
-            // Fetch the newly created message to return to the client
             $newMessage = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            // Create notification for recipients of this conversation
+            try {
+                $recipients = $conn->prepare("SELECT UserID FROM ChatParticipants WHERE ConversationID = ? AND UserID != ?");
+                $recipients->execute([$conversation_id, $current_user_id]);
+                $recipientList = $recipients->fetchAll(PDO::FETCH_ASSOC);
+                
+                $sender = $conn->prepare("SELECT FirstName, LastName FROM Accounts WHERE UserID = ?");
+                $sender->execute([$current_user_id]);
+                $senderInfo = $sender->fetch(PDO::FETCH_ASSOC);
+                $senderName = trim(($senderInfo['FirstName'] ?? '') . ' ' . ($senderInfo['LastName'] ?? ''));
+                
+                $created = 0; $failed = 0; $createdIds = [];
+                foreach ($recipientList as $recipient) {
+                    $link = '/branch1/chat.php?conversation_id=' . intval($conversation_id) . '&open=1';
+                    $nid = createNotification($conn, 'chat', 'Message', 'New message from ' . $senderName, substr($message_content, 0, 200) . (strlen($message_content) > 200 ? '...' : ''), $link, $recipient['UserID']);
+                    if ($nid) { $created++; $createdIds[] = $nid; }
+                    else { $failed++; }
+                }
+                if ($failed > 0) error_log("Chat notifications: created={$created}, failed={$failed}");
+            } catch (Throwable $e) {
+                error_log("Chat notification error: " . $e->getMessage());
+            }
 
             send_response(['success' => true, 'message' => $newMessage]);
         } catch (PDOException $e) {
-            error_log("SP_SendMessage error: " . $e->getMessage());
+            error_log("Send message error: " . $e->getMessage());
             send_response(['success' => false, 'error' => 'Failed to send message.']);
         }
         break;
 
-    // --- Get all users to start a new chat ---
     case 'get_users':
         try {
             $stmt = $conn->prepare("SELECT UserID, FirstName, LastName, Role, BranchID FROM Accounts WHERE UserID != :current_user_id ORDER BY FirstName, LastName");
@@ -108,7 +151,6 @@ switch ($action) {
         }
         break;
 
-    // --- Create a new conversation with another user ---
     case 'create_conversation':
         $recipient_id = $_POST['recipient_id'] ?? 0;
         if (empty($recipient_id) || $recipient_id == $current_user_id) {
@@ -116,24 +158,15 @@ switch ($action) {
         }
 
         try {
-            // Use the stored procedure to find or create a conversation
-            $stmt = $conn->prepare("CALL SP_FindOrCreateConversation(:p_User1_ID, :p_User2_ID, @p_ConversationID)");
-            $stmt->bindParam(':p_User1_ID', $current_user_id, PDO::PARAM_INT);
-            $stmt->bindParam(':p_User2_ID', $recipient_id, PDO::PARAM_INT);
+            $stmt = $conn->prepare("CALL SP_FindOrCreateConversation(:u1, :u2)");
+            $stmt->bindParam(':u1', $current_user_id, PDO::PARAM_INT);
+            $stmt->bindParam(':u2', $recipient_id, PDO::PARAM_INT);
             $stmt->execute();
-            $stmt->closeCursor();
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            // Fetch the output parameter
-            $result = $conn->query("SELECT @p_ConversationID AS conversationId")->fetch(PDO::FETCH_ASSOC);
-            $conversation_id = $result['conversationId'];
-
-            if ($conversation_id) {
-                send_response(['success' => true, 'conversation_id' => $conversation_id]);
-            } else {
-                send_response(['success' => false, 'error' => 'Could not create or find conversation.']);
-            }
+            send_response(['success' => true, 'conversation_id' => $result['ConversationID']]);
         } catch (PDOException $e) {
-            error_log("SP_FindOrCreateConversation error: " . $e->getMessage());
+            error_log("Create conversation error: " . $e->getMessage());
             send_response(['success' => false, 'error' => 'Database error while creating conversation.']);
         }
         break;
