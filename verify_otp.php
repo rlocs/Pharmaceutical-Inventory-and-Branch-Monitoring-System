@@ -59,7 +59,7 @@ if (isset($_POST['resend_otp'])) {
         $user_id = $_SESSION['otp_user_id'];
         
         // Get user details
-        $user_stmt = $conn->prepare("SELECT Email, FirstName, LastName FROM Accounts WHERE UserID = ?");
+        $user_stmt = $conn->prepare("SELECT FirstName, LastName FROM Accounts WHERE UserID = ?");
         $user_stmt->execute([$user_id]);
         $user = $user_stmt->fetch(PDO::FETCH_ASSOC);
         
@@ -105,11 +105,28 @@ if (isset($_POST['resend_otp'])) {
             $response = curl_exec($ch);
             $curl_error = curl_error($ch);
             curl_close($ch);
-            
+
+            // Log API response
+            @file_put_contents(__DIR__ . '/logs/otp_api.log', date('c') . " | resend_otp | user_id={$user_id} | phone=" . ($phone_result['PersonalPhoneNumber'] ?? '') . " | curl_error=" . ($curl_error ?: 'none') . " | response=" . substr($response ?? '', 0, 2000) . "\n", FILE_APPEND);
+
+            $result_api = json_decode($response, true);
             if (!$curl_error) {
-                $result_api = json_decode($response, true);
                 if (isset($result_api['status']) && $result_api['status'] === 'success') {
                     $success = "OTP resent successfully! Check your phone.";
+                } else {
+                    $app_env = strtolower(Config::get('APP_ENV', 'production'));
+                    $debug = strtolower(Config::get('DEBUG', 'false')) === 'true';
+                    if ($debug || $app_env !== 'production') {
+                        @file_put_contents(__DIR__ . '/logs/otp_debug.log', date('c') . " | resend_otp_debug | user_id={$user_id} | phone=" . ($phone_result['PersonalPhoneNumber'] ?? '') . " | otp={$otp} | api_response=" . substr(json_encode($result_api), 0, 2000) . "\n", FILE_APPEND);
+                        $success = "OTP resent (debug): check server logs.";
+                    }
+                }
+            } else {
+                $app_env = strtolower(Config::get('APP_ENV', 'production'));
+                $debug = strtolower(Config::get('DEBUG', 'false')) === 'true';
+                if ($debug || $app_env !== 'production') {
+                    @file_put_contents(__DIR__ . '/logs/otp_debug.log', date('c') . " | resend_otp_debug (curl error) | user_id={$user_id} | phone=" . ($phone_result['PersonalPhoneNumber'] ?? '') . " | otp={$otp} | curl_error=" . substr($curl_error ?? '', 0, 2000) . "\n", FILE_APPEND);
+                    $success = "OTP resent (debug): check server logs.";
                 }
             }
         }
@@ -217,7 +234,7 @@ if (isset($_POST['resend_otp'])) {
             <!-- Back to Forgot Password -->
             <div class="text-center mt-4">
                 <p class="text-gray-600 text-sm">
-                    Wrong email? 
+                    Wrong phone? 
                     <a href="forgot.php" class="text-indigo-600 hover:text-indigo-700 font-semibold">Go Back</a>
                 </p>
             </div>

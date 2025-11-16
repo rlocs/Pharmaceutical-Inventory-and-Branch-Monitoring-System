@@ -264,15 +264,15 @@ VALUES (LAST_INSERT_ID(), '1985-04-10', 'Male', '09493298133', '101 Maple Ave, B
 
 -- B. STAFF 1, BRANCH 1 (Lipa)
 INSERT INTO Accounts (BranchID, UserCode, FirstName, LastName, Email, HashedPassword, Role)
-VALUES (1, 'STAFF1B1', 'Erryca', 'Hizon', 'abistadoerryca@gmail.com', '$2y$10$b3XJ2UTkPSS28yiJo.7YFOk3BbLZ8MZeqzcreHpCqdGqbdh9H6veG', 'Staff');
+VALUES (1, 'STAFF1B1', 'Abby', 'Balambing', 'talasabbygaileunice@gmail.com', '$2y$10$b3XJ2UTkPSS28yiJo.7YFOk3BbLZ8MZeqzcreHpCqdGqbdh9H6veG', 'Staff');
 INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalPhoneNumber, PersonalAddress, EmergencyContactName, EmergencyContactPhone, HireDate, Position, Salary, NationalIDNumber)
-VALUES (LAST_INSERT_ID(), '1992-11-20', 'Female', '09509002527', '202 Oak St, Branch 1 Lipa City', 'Zamburat', '09123456789', '2022-05-15', 'staff',48000.00, '23456789012');
+VALUES (LAST_INSERT_ID(), '1992-11-20', 'Female', '09954121900', '202 Oak St, Branch 1 Lipa City', 'Zamburat', '09123456789', '2022-05-15', 'staff',48000.00, '23456789012');
 
 -- C. STAFF 1, BRANCH 2 (Sto Tomas)
 INSERT INTO Accounts (BranchID, UserCode, FirstName, LastName, Email, HashedPassword, Role)
-VALUES (2, 'STAFF1B2', 'Abby', 'Balambing', 'Abby.b@branch2.com', '$2y$10$b3XJ2UTkPSS28yiJo.7YFOk3BbLZ8MZeqzcreHpCqdGqbdh9H6veG', 'Staff');
+VALUES (2, 'STAFF1B2', 'Erryca', 'Hizon', 'abistadoerryca@gmail.com', '$2y$10$b3XJ2UTkPSS28yiJo.7YFOk3BbLZ8MZeqzcreHpCqdGqbdh9H6veG', 'Staff');
 INSERT INTO Details (UserID, DateOfBirth, Gender, PersonalPhoneNumber, PersonalAddress, EmergencyContactName, EmergencyContactPhone, HireDate,  Position, Salary, NationalIDNumber)
-VALUES (LAST_INSERT_ID(), '1998-07-05', 'Female', '09493298133', '303 Pine Lane, Branch 2 Sto Tomas City','Mamita delarosa', '099762354278', '2023-01-20', 'Staff', 45000.00, '34567890123');
+VALUES (LAST_INSERT_ID(), '1998-07-05', 'Female', '09509002527', '303 Pine Lane, Branch 2 Sto Tomas City','Mamita delarosa', '099762354278', '2023-01-20', 'Staff', 45000.00, '34567890123');
 
 -- D. STAFF 1, BRANCH 3 (Malvar)
 INSERT INTO Accounts (BranchID, UserCode, FirstName, LastName, Email, HashedPassword, Role)
