@@ -60,7 +60,7 @@ if (isset($_POST['reset_password'])) {
 
                 // Mark reset success and clear OTP session keys
                 $_SESSION['reset_success'] = true;
-                unset($_SESSION['otp_verified'], $_SESSION['otp_user_id'], $_SESSION['otp_email'], $_SESSION['otp_user_name']);
+                unset($_SESSION['otp_verified'], $_SESSION['otp_user_id'], $_SESSION['otp_phone'], $_SESSION['otp_user_name']);
 
                 // Redirect to login with success
                 header('Location: b-login.php?reset=success');
