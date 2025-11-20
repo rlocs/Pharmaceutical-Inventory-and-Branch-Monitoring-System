@@ -123,7 +123,7 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
         </nav>
 
         <!-- 3. MAIN CONTENT AREA (Cream Background) -->
-        <main class="bg-custom-bg-cream p-6 flex-grow h-full relative z-10">
+        <main class="bg-custom-bg-white p-6 flex-grow h-full relative z-10">
             <div class="main-content flex-1 p-6 lg:p-10 overflow-y-auto bg-main-bg-color">
                 <h2 id="page-title" class="text-4xl font-extrabold text-gray-900 mb-4">
                     Reports 
