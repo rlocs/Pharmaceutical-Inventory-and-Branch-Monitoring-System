@@ -1,0 +1,33 @@
+# Environment and Configuration
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Dependencies
+/vendor/
+/node_modules/
+
+# Build
+/dist/
+/build/
+
+# Logs
+*.log
+logs/
+
+# Temporary
+/tmp/
+/temp/
+*.tmp
+
+# System
+Thumbs.db
+.DS_Store
