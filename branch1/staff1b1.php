@@ -252,7 +252,7 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
         </nav>
 
         <!-- 3. MAIN CONTENT AREA (Cream Background) -->
-        <main class="bg-custom-bg-cream p-6 flex-grow h-full relative z-10">
+        <main class="bg-custom-bg-white p-6 flex-grow h-full relative z-10">
             <div id="dynamic-content" class="main-content flex-1 p-6 lg:p-10 overflow-y-auto bg-main-bg-color">
                 <!-- Page Header -->
                 <div class="flex justify-between items-start mb-8">

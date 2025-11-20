@@ -1,7 +1,7 @@
 <?php
 class Database {
     // This IP MUST be the address of the computer running the MySQL database.
-    private $host = '192.168.18.83';
+    private $host = '100.71.125.101';
 
     private $db_name = 'pharmaceutical_db';
     private $username = 'pharma_user'; // The new user you created for network access

@@ -54,6 +54,114 @@ CREATE TABLE OTPVerification (
     AttemptCount INT DEFAULT 0,
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID) ON DELETE CASCADE
 )ENGINE=InnoDB;
+CREATE TABLE Categories (
+    CategoryID INT PRIMARY KEY AUTO_INCREMENT,
+    CategoryName VARCHAR(50) UNIQUE NOT NULL,
+    Description TEXT,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Populate Categories table with existing category names from the old ENUM
+INSERT INTO Categories (CategoryName) VALUES
+('Analgesic'),
+('Antibiotic'),
+('Antiseptic'),
+('Antipyretic'),
+('Antihistamine'),
+('Antiviral'),
+('Antifungal'),
+('Cardiovascular'),
+('Cough and Cold'),
+('Diuretic'),
+('Gastrointestinal'),
+('Hormonal'),
+('Nutritional Supplement'),
+('Pain Relief'),
+('Respiratory'),
+('Sedative'),
+('Topical'),
+('Vaccine'),
+('Vitamin/Mineral'),
+('Other'),
+('Antacid'),
+('Antidiabetic'),
+('Antihypertensive'),
+('Cholesterol'),
+('Anticonvulsant'),
+('Thyroid'),
+('Antidepressant'),
+('Anticoagulant'),
+('Biologic'),
+('Urological'),
+('Erectile Dysfunction'),
+('Supplement'),
+('Sleep Aid'),
+('Cardio'),
+('Cough/Cold'),
+('Corticosteroid')
+ON DUPLICATE KEY UPDATE CategoryName = CategoryName;
+
+
+CREATE INDEX idx_chat_messages_conversation ON ChatMessages(ConversationID, Timestamp);
+CREATE INDEX idx_accounts_usercode ON Accounts(UserCode);
+
+-- BranchInventory queries
+CREATE INDEX idx_branch_inventory_branchid ON BranchInventory(BranchID);
+CREATE INDEX idx_branch_inventory_medicineid ON BranchInventory(MedicineID);
+CREATE INDEX idx_branch_inventory_expiry ON BranchInventory(ExpiryDate);
+CREATE INDEX idx_branch_inventory_stocks ON BranchInventory(Stocks);
+
+-- Accounts queries
+CREATE INDEX idx_accounts_branchid ON Accounts(BranchID);
+CREATE INDEX idx_accounts_role ON Accounts(Role);
+CREATE INDEX idx_accounts_status ON Accounts(AccountStatus);
+
+-- Chat queries
+CREATE INDEX idx_chat_messages_conversation_timestamp ON ChatMessages(ConversationID, Timestamp);
+CREATE INDEX idx_chat_participants_userid ON ChatParticipants(UserID);
+CREATE INDEX idx_chat_participants_conversation ON ChatParticipants(ConversationID);
+
+-- Transaction queries
+CREATE INDEX idx_sales_transactions_branchid_date ON SalesTransactions(BranchID, TransactionDateTime);
+CREATE INDEX idx_sales_transactions_userid ON SalesTransactions(UserID);
+CREATE INDEX idx_transaction_items_transactionid ON TransactionItems(TransactionID);
+
+-- Ensure positive stock values
+ALTER TABLE BranchInventory 
+ADD CONSTRAINT chk_stocks_positive CHECK (Stocks >= 0);
+
+-- Ensure positive prices
+ALTER TABLE BranchInventory 
+ADD CONSTRAINT chk_price_positive CHECK (Price >= 0);
+
+-- Ensure positive quantities
+ALTER TABLE TransactionItems 
+ADD CONSTRAINT chk_quantity_positive CHECK (Quantity > 0);
+
+-- Ensure positive subtotals
+ALTER TABLE TransactionItems 
+ADD CONSTRAINT chk_subtotal_positive CHECK (Subtotal >= 0);
+
+-- Ensure valid expiry dates (not in past for new entries)
+-- Note: This would need to be enforced at application level
+-- or use a trigger
+
+
+---Some tables lack audit information
+
+-- Add to BranchInventory
+ALTER TABLE BranchInventory 
+ADD COLUMN CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ADD COLUMN CreatedBy INT,
+ADD COLUMN UpdatedBy INT,
+ADD FOREIGN KEY (CreatedBy) REFERENCES Accounts(UserID),
+ADD FOREIGN KEY (UpdatedBy) REFERENCES Accounts(UserID);
+
+-- Add to SalesTransactions 
+ALTER TABLE SalesTransactions 
+ADD COLUMN UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
 
 -- Table 4: medicines (Correct)
 
@@ -841,111 +949,4 @@ END //
 
 DELIMITER ;
 
-CREATE TABLE Categories (
-    CategoryID INT PRIMARY KEY AUTO_INCREMENT,
-    CategoryName VARCHAR(50) UNIQUE NOT NULL,
-    Description TEXT,
-    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- Populate Categories table with existing category names from the old ENUM
-INSERT INTO Categories (CategoryName) VALUES
-('Analgesic'),
-('Antibiotic'),
-('Antiseptic'),
-('Antipyretic'),
-('Antihistamine'),
-('Antiviral'),
-('Antifungal'),
-('Cardiovascular'),
-('Cough and Cold'),
-('Diuretic'),
-('Gastrointestinal'),
-('Hormonal'),
-('Nutritional Supplement'),
-('Pain Relief'),
-('Respiratory'),
-('Sedative'),
-('Topical'),
-('Vaccine'),
-('Vitamin/Mineral'),
-('Other'),
-('Antacid'),
-('Antidiabetic'),
-('Antihypertensive'),
-('Cholesterol'),
-('Anticonvulsant'),
-('Thyroid'),
-('Antidepressant'),
-('Anticoagulant'),
-('Biologic'),
-('Urological'),
-('Erectile Dysfunction'),
-('Supplement'),
-('Sleep Aid'),
-('Cardio'),
-('Cough/Cold'),
-('Corticosteroid')
-ON DUPLICATE KEY UPDATE CategoryName = CategoryName;
-
-
-CREATE INDEX idx_chat_messages_conversation ON ChatMessages(ConversationID, Timestamp);
-CREATE INDEX idx_accounts_usercode ON Accounts(UserCode);
-
--- BranchInventory queries
-CREATE INDEX idx_branch_inventory_branchid ON BranchInventory(BranchID);
-CREATE INDEX idx_branch_inventory_medicineid ON BranchInventory(MedicineID);
-CREATE INDEX idx_branch_inventory_expiry ON BranchInventory(ExpiryDate);
-CREATE INDEX idx_branch_inventory_stocks ON BranchInventory(Stocks);
-
--- Accounts queries
-CREATE INDEX idx_accounts_branchid ON Accounts(BranchID);
-CREATE INDEX idx_accounts_role ON Accounts(Role);
-CREATE INDEX idx_accounts_status ON Accounts(AccountStatus);
-
--- Chat queries
-CREATE INDEX idx_chat_messages_conversation_timestamp ON ChatMessages(ConversationID, Timestamp);
-CREATE INDEX idx_chat_participants_userid ON ChatParticipants(UserID);
-CREATE INDEX idx_chat_participants_conversation ON ChatParticipants(ConversationID);
-
--- Transaction queries
-CREATE INDEX idx_sales_transactions_branchid_date ON SalesTransactions(BranchID, TransactionDateTime);
-CREATE INDEX idx_sales_transactions_userid ON SalesTransactions(UserID);
-CREATE INDEX idx_transaction_items_transactionid ON TransactionItems(TransactionID);
-
--- Ensure positive stock values
-ALTER TABLE BranchInventory 
-ADD CONSTRAINT chk_stocks_positive CHECK (Stocks >= 0);
-
--- Ensure positive prices
-ALTER TABLE BranchInventory 
-ADD CONSTRAINT chk_price_positive CHECK (Price >= 0);
-
--- Ensure positive quantities
-ALTER TABLE TransactionItems 
-ADD CONSTRAINT chk_quantity_positive CHECK (Quantity > 0);
-
--- Ensure positive subtotals
-ALTER TABLE TransactionItems 
-ADD CONSTRAINT chk_subtotal_positive CHECK (Subtotal >= 0);
-
--- Ensure valid expiry dates (not in past for new entries)
--- Note: This would need to be enforced at application level
--- or use a trigger
-
-
----Some tables lack audit information
-
--- Add to BranchInventory
-ALTER TABLE BranchInventory 
-ADD COLUMN CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-ADD COLUMN CreatedBy INT,
-ADD COLUMN UpdatedBy INT,
-ADD FOREIGN KEY (CreatedBy) REFERENCES Accounts(UserID),
-ADD FOREIGN KEY (UpdatedBy) REFERENCES Accounts(UserID);
-
--- Add to SalesTransactions 
-ALTER TABLE SalesTransactions 
-ADD COLUMN UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
