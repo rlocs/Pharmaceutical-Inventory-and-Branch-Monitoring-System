@@ -233,7 +233,7 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
         </header>
 
         <!-- 2. SECONDARY NAVIGATION BAR (Light Cream/White) -->
-        <nav class="bg-white border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
+        <nav class="bg-[#F4F6FA] border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
 
             <!-- Navigation Links - INCREASED TEXT SIZE to text-base -->
             <div class="flex space-x-8 text-base font-medium">
@@ -252,7 +252,7 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
         </nav>
 
         <!-- 3. MAIN CONTENT AREA (Cream Background) -->
-        <main class="bg-custom-bg-white p-6 flex-grow h-full relative z-10">
+        <main class="bg-custom-bg-[#FFFFFF] p-6 flex-grow h-full relative z-10">
             <div id="dynamic-content" class="main-content flex-1 p-6 lg:p-10 overflow-y-auto bg-main-bg-color">
                 <!-- Page Header -->
                 <div class="flex justify-between items-start mb-8">
@@ -270,15 +270,15 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
                 </div>
 
                 <!-- Live Clock Section -->
-                <div class="bg-white rounded-3xl shadow-lg p-6 mb-6 text-center border border-gray-100">
-                    <div class="text-5xl font-bold text-purple-600 mb-2" id="live-time">00:00:00</div>
+                <div class="bg-[#F4F6FA] rounded-3xl shadow-lg p-6 mb-6 text-center border border-gray-100">
+                    <div class="text-5xl font-bold text-blue-600 mb-2" id="live-time">00:00:00</div>
                     <div class="text-lg text-gray-600" id="live-date"></div>
                 </div>
 
                 <!-- KPI Cards Row 1: Sales Metrics -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                     <!-- Today's Sales -->
-                    <div class="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-3xl shadow-lg border-l-4 border-green-500 hover:shadow-xl transition">
+                    <div class="bg-[#F4F6FA] from-green-50 to-green-100 p-6 rounded-3xl shadow-lg border-l-4 border-green-500 hover:shadow-xl transition">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Today's Sales</p>
@@ -290,7 +290,7 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
                     </div>
 
                     <!-- This Week -->
-                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-3xl shadow-lg border-l-4 border-blue-500 hover:shadow-xl transition">
+                    <div class="bg-[#F4F6FA] from-blue-50 to-blue-100 p-6 rounded-3xl shadow-lg border-l-4 border-blue-500 hover:shadow-xl transition">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">This Week</p>
@@ -302,7 +302,7 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
                     </div>
 
                     <!-- This Month -->
-                    <div class="bg-gradient-to-br from-indigo-50 to-indigo-100 p-6 rounded-3xl shadow-lg border-l-4 border-indigo-500 hover:shadow-xl transition">
+                    <div class="bg-[#F4F6FA] from-indigo-50 to-indigo-100 p-6 rounded-3xl shadow-lg border-l-4 border-indigo-500 hover:shadow-xl transition">
                         <div class="flex items-center justify-between">
                             <div>
                                 <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">This Month</p>
@@ -329,28 +329,28 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
                 <!-- KPI Cards Row 2: Stock Status -->
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
                     <!-- Active Medicines -->
-                    <div class="bg-white p-6 rounded-3xl shadow-lg border border-green-200 hover:shadow-xl transition">
+                    <div class="bg-[#F4F6FA] p-6 rounded-3xl shadow-lg border border-green-200 hover:shadow-xl transition">
                         <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Active Medicines</p>
                         <p class="text-3xl font-bold text-green-600 mt-2"><?php echo $total_active; ?></p>
                         <p class="text-sm text-gray-500 mt-2">✓ In stock</p>
                     </div>
 
                     <!-- Low Stock -->
-                    <div class="bg-white p-6 rounded-3xl shadow-lg border border-yellow-200 hover:shadow-xl transition">
+                    <div class="bg-[#F4F6FA] p-6 rounded-3xl shadow-lg border border-yellow-200 hover:shadow-xl transition">
                         <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Low Stock</p>
                         <p class="text-3xl font-bold text-yellow-600 mt-2"><?php echo $low_stock; ?></p>
                         <p class="text-sm text-gray-500 mt-2">⚠ Needs reorder</p>
                     </div>
 
                     <!-- Out of Stock -->
-                    <div class="bg-white p-6 rounded-3xl shadow-lg border border-orange-200 hover:shadow-xl transition">
+                    <div class="bg-[#F4F6FA] p-6 rounded-3xl shadow-lg border border-orange-200 hover:shadow-xl transition">
                         <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Out of Stock</p>
                         <p class="text-3xl font-bold text-orange-600 mt-2"><?php echo $out_of_stock; ?></p>
                         <p class="text-sm text-gray-500 mt-2">✗ Unavailable</p>
                     </div>
 
                     <!-- Expiring Soon -->
-                    <div class="bg-white p-6 rounded-3xl shadow-lg border border-red-200 hover:shadow-xl transition">
+                    <div class="bg-[#F4F6FA] p-6 rounded-3xl shadow-lg border border-red-200 hover:shadow-xl transition">
                         <p class="text-sm font-semibold text-gray-600 uppercase tracking-wide">Expiring Soon</p>
                         <p class="text-3xl font-bold text-red-600 mt-2"><?php echo $expiring_soon + $expired; ?></p>
                         <p class="text-sm text-gray-500 mt-2">⏰ Next 30 days</p>
@@ -360,7 +360,7 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
                 <!-- Charts Section -->
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
                     <!-- Sales Trend Chart -->
-                    <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
+                    <div class="bg-[#F4F6FA] p-6 rounded-3xl shadow-lg border border-gray-100">
                         <h3 class="text-xl font-bold text-gray-900 mb-4">Sales Trend (Last 7 Days)</h3>
                         <canvas id="salesChart"></canvas>
                     </div>
