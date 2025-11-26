@@ -55,7 +55,23 @@ $action = $_POST['action'] ?? $_GET['action'] ?? '';
 switch ($action) {
     case 'get_conversations':
         try {
-            $stmt = $conn->prepare("CALL SP_GetConversations(:user_id)");
+            $stmt = $conn->prepare("
+                SELECT
+                    c.ConversationID,
+                    c.LastMessageTimestamp,
+                    p.FirstName,
+                    p.LastName,
+                    b.BranchName,
+                    (SELECT MessageContent FROM ChatMessages WHERE ConversationID = c.ConversationID ORDER BY Timestamp DESC LIMIT 1) as LastMessage,
+                    (SELECT COUNT(*) FROM ChatMessages WHERE ConversationID = c.ConversationID AND SenderUserID != :user_id AND Timestamp > cp.LastReadTimestamp) as UnreadCount
+                FROM ChatConversations c
+                JOIN ChatParticipants cp ON c.ConversationID = cp.ConversationID
+                JOIN ChatParticipants op ON c.ConversationID = op.ConversationID AND op.UserID != cp.UserID
+                JOIN Accounts p ON op.UserID = p.UserID
+                LEFT JOIN Branches b ON p.BranchID = b.BranchID
+                WHERE cp.UserID = :user_id
+                ORDER BY c.LastMessageTimestamp DESC
+            ");
             $stmt->bindParam(':user_id', $current_user_id, PDO::PARAM_INT);
             $stmt->execute();
             $conversations = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -100,27 +116,48 @@ switch ($action) {
         }
 
         try {
-            $stmt = $conn->prepare("CALL SP_SendMessage(:conv, :sender, :msg)");
-            $stmt->bindParam(':conv', $conversation_id, PDO::PARAM_INT);
-            $stmt->bindParam(':sender', $current_user_id, PDO::PARAM_INT);
-            $stmt->bindParam(':msg', $message_content, PDO::PARAM_STR);
-            $stmt->execute();
-            $newMessage = $stmt->fetch(PDO::FETCH_ASSOC);
+            // Insert message
+            $stmt = $conn->prepare("INSERT INTO ChatMessages (ConversationID, SenderUserID, MessageContent, Timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)");
+            $stmt->execute([$conversation_id, $current_user_id, $message_content]);
+            $messageId = $conn->lastInsertId();
+
+            // Update conversation timestamp
+            $update = $conn->prepare("UPDATE ChatConversations SET LastMessageTimestamp = CURRENT_TIMESTAMP WHERE ConversationID = ?");
+            $update->execute([$conversation_id]);
+
+            // Fetch the new message
+            $fetch = $conn->prepare("
+                SELECT
+                    cm.MessageID,
+                    cm.ConversationID,
+                    cm.SenderUserID,
+                    cm.MessageContent,
+                    cm.Timestamp,
+                    a.FirstName,
+                    a.LastName
+                FROM ChatMessages cm
+                JOIN Accounts a ON cm.SenderUserID = a.UserID
+                WHERE cm.MessageID = ?
+            ");
+            $fetch->execute([$messageId]);
+            $newMessage = $fetch->fetch(PDO::FETCH_ASSOC);
 
             // Create notification for recipients of this conversation
             try {
                 $recipients = $conn->prepare("SELECT UserID FROM ChatParticipants WHERE ConversationID = ? AND UserID != ?");
                 $recipients->execute([$conversation_id, $current_user_id]);
                 $recipientList = $recipients->fetchAll(PDO::FETCH_ASSOC);
-                
+
                 $sender = $conn->prepare("SELECT FirstName, LastName FROM Accounts WHERE UserID = ?");
                 $sender->execute([$current_user_id]);
                 $senderInfo = $sender->fetch(PDO::FETCH_ASSOC);
                 $senderName = trim(($senderInfo['FirstName'] ?? '') . ' ' . ($senderInfo['LastName'] ?? ''));
-                
+
                 foreach ($recipientList as $recipient) {
                     createNotification($conn, 'chat', 'Message', 'New message from ' . $senderName, substr($message_content, 0, 100) . (strlen($message_content) > 100 ? '...' : ''), 'javascript:void(0);', $recipient['UserID']);
                 }
+                // Also create notification for sender to show in their bell
+                createNotification($conn, 'chat', 'Message', 'Message sent', substr($message_content, 0, 100) . (strlen($message_content) > 100 ? '...' : ''), 'javascript:void(0);', $current_user_id);
             } catch (Throwable $e) {
                 error_log("Chat notification error: " . $e->getMessage());
             }
@@ -152,13 +189,51 @@ switch ($action) {
         }
 
         try {
-            $stmt = $conn->prepare("CALL SP_FindOrCreateConversation(:u1, :u2)");
-            $stmt->bindParam(':u1', $current_user_id, PDO::PARAM_INT);
-            $stmt->bindParam(':u2', $recipient_id, PDO::PARAM_INT);
-            $stmt->execute();
-            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+            // Check if recipient exists
+            $checkUser = $conn->prepare("SELECT UserID FROM Accounts WHERE UserID = ?");
+            $checkUser->execute([$recipient_id]);
+            if (!$checkUser->fetch()) {
+                send_response(['success' => false, 'error' => 'Recipient not found.']);
+            }
 
-            send_response(['success' => true, 'conversation_id' => $result['ConversationID']]);
+            // First, check if a conversation already exists between the two users
+            $checkStmt = $conn->prepare("
+                SELECT ConversationID
+                FROM ChatParticipants
+                WHERE UserID IN (:u1, :u2)
+                GROUP BY ConversationID
+                HAVING COUNT(DISTINCT UserID) = 2
+                LIMIT 1
+            ");
+            $checkStmt->bindParam(':u1', $current_user_id, PDO::PARAM_INT);
+            $checkStmt->bindParam(':u2', $recipient_id, PDO::PARAM_INT);
+            $checkStmt->execute();
+            $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($existing) {
+                // Conversation already exists, return the existing ID
+                send_response(['success' => true, 'conversation_id' => $existing['ConversationID']]);
+            } else {
+                // No existing conversation, create a new one
+                // Insert new conversation
+                $insertConv = $conn->prepare("INSERT INTO ChatConversations (LastMessageTimestamp) VALUES (CURRENT_TIMESTAMP)");
+                $insertConv->execute();
+                $conversationId = $conn->lastInsertId();
+
+                // Get branch IDs for both users
+                $getBranch = $conn->prepare("SELECT BranchID FROM Accounts WHERE UserID = ?");
+                $getBranch->execute([$current_user_id]);
+                $currentBranch = $getBranch->fetch(PDO::FETCH_ASSOC)['BranchID'];
+                $getBranch->execute([$recipient_id]);
+                $recipientBranch = $getBranch->fetch(PDO::FETCH_ASSOC)['BranchID'];
+
+                // Insert participants
+                $insertPart = $conn->prepare("INSERT INTO ChatParticipants (ConversationID, UserID, BranchID, LastReadTimestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)");
+                $insertPart->execute([$conversationId, $current_user_id, $currentBranch]);
+                $insertPart->execute([$conversationId, $recipient_id, $recipientBranch]);
+
+                send_response(['success' => true, 'conversation_id' => $conversationId]);
+            }
         } catch (PDOException $e) {
             error_log("Create conversation error: " . $e->getMessage());
             send_response(['success' => false, 'error' => 'Database error while creating conversation.']);

@@ -535,6 +535,13 @@
         const clonedInitialPrompt = container.querySelector('#initial-prompt');
         if (!clonedMsgContainer) return;
 
+        // Check if this conversation has been cleared
+        const clearedConversations = JSON.parse(localStorage.getItem('clearedConversations') || '[]');
+        if (clearedConversations.includes(state.currentChatId)) {
+            clonedMsgContainer.innerHTML = '<p class="text-center text-sm italic text-gray-500 p-8">Messages cleared from view. Messages are still stored in the database.</p>';
+            return;
+        }
+
         // Hide initial prompt when messages are loaded
         if (clonedInitialPrompt) clonedInitialPrompt.classList.add('hidden');
 
@@ -689,6 +696,16 @@
         if (chatView) chatView.classList.remove('justify-center', 'items-center');
         if (inputArea) inputArea.classList.remove('hidden');
 
+        // Check if this conversation has been cleared
+        const clearedConversations = JSON.parse(localStorage.getItem('clearedConversations') || '[]');
+        if (clearedConversations.includes(conversationId)) {
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '<p class="text-center text-sm italic text-gray-500 p-8">Messages cleared from view. Messages are still stored in the database.</p>';
+            }
+            window.switchView('chat');
+            return;
+        }
+
         // Load messages
         if (messagesContainer) messagesContainer.innerHTML = '<p class="text-center text-sm italic text-gray-500 p-8">Loading messages...</p>';
         apiRequest('get_messages', { conversation_id: conversationId }, 'GET').then(res => {
@@ -758,6 +775,39 @@
                 renderMessages();
             }
         });
+    };
+
+    window.clearMessages = function() {
+        if (!state.currentChatId) return;
+
+        if (confirm('Clear all messages from this conversation? Messages will be hidden from view but remain stored in the database for history and logs.')) {
+            // Store cleared conversation in localStorage
+            let clearedConversations = JSON.parse(localStorage.getItem('clearedConversations') || '[]');
+            if (!clearedConversations.includes(state.currentChatId)) {
+                clearedConversations.push(state.currentChatId);
+                localStorage.setItem('clearedConversations', JSON.stringify(clearedConversations));
+            }
+
+            // Clear messages from view
+            state.messages = [];
+            const messagesContainer = document.getElementById('messages-container');
+            if (messagesContainer) {
+                messagesContainer.innerHTML = '<p class="text-center text-sm italic text-gray-500 p-8">Messages cleared from view. Messages are still stored in the database.</p>';
+            }
+
+            // If zoomed, clear in zoom window as well
+            if (window.zoomWindow && !window.zoomWindow.closed) {
+                try {
+                    const zoomDoc = window.zoomWindow.document;
+                    const zoomMessagesContainer = zoomDoc.getElementById('messages-container');
+                    if (zoomMessagesContainer) {
+                        zoomMessagesContainer.innerHTML = '<p class="text-center text-sm italic text-gray-500 p-8">Messages cleared from view. Messages are still stored in the database.</p>';
+                    }
+                } catch (e) {
+                    // Ignore cross-window access errors
+                }
+            }
+        }
     };
 
     function fetchConversations() {

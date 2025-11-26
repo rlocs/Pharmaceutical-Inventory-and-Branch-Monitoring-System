@@ -25,6 +25,8 @@
   let pollingInterval = null;
   let limit = 50; // can increase with load more
   let filterText = '';
+  let previousChatCount = 0;
+  let previousAlertsCount = 0;
 
   function timeAgo(ts){
     const dt = new Date(ts);
@@ -229,6 +231,76 @@
       refresh();
     } catch(e){}
   });
+
+  function showPushNotification(title, body, type) {
+    if (!('Notification' in window)) {
+      console.warn('This browser does not support desktop notifications');
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      const notification = new Notification(title, {
+        body: body,
+        icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTYuOCA4YTYuNiA2LjYgMCAxIDEgMTIgMGMwIDcuIDMgOSA2IDloLTZzMy0yIDMtOVoiIGZpbGw9IiM0ZjQ2ZTUiLz4KPHBhdGggZD0iTTEwLjM3NSAyMmEyIDIgMCAwIDAgMy4yNSAwIiBmaWxsPSIjNGY0NmU1Ii8+Cjwvc3ZnPg==',
+        tag: type,
+        requireInteraction: false
+      });
+
+      notification.onclick = function() {
+        window.focus();
+        dropdown.classList.toggle('hidden');
+        if (dropdown.classList.contains('hidden')) {
+          // Switch to the relevant tab
+          if (type === 'chat') {
+            document.querySelectorAll('.notification-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.notification-tab[data-tab="chat"]').classList.add('active');
+            listAll.classList.add('hidden');
+            listAlerts.classList.add('hidden');
+            listChat.classList.remove('hidden');
+            // Mark all chat notifications as read when opening chat tab
+            fetch('./api/notifications.php?action=mark_all_read&type=chat', { method: 'POST', credentials: 'same-origin' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update badge count after marking as read
+                        fetchSummary();
+                    }
+                })
+                .catch(err => console.error('Error marking chat notifications as read:', err));
+            fetchList('chat').then(items => renderList(listChat, items));
+          } else if (type === 'alerts') {
+            document.querySelectorAll('.notification-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector('.notification-tab[data-tab="alerts"]').classList.add('active');
+            listAll.classList.add('hidden');
+            listChat.classList.add('hidden');
+            listAlerts.classList.remove('hidden');
+            // Mark all alerts notifications as read when opening alerts tab
+            fetch('./api/notifications.php?action=mark_all_read&type=alerts', { method: 'POST', credentials: 'same-origin' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        // Update badge count after marking as read
+                        fetchSummary();
+                    }
+                })
+                .catch(err => console.error('Error marking alerts notifications as read:', err));
+            fetchList('alerts').then(items => renderList(listAlerts, items));
+          }
+        }
+        notification.close();
+      };
+
+      setTimeout(() => {
+        notification.close();
+      }, 5000);
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(function(permission) {
+        if (permission === 'granted') {
+          showPushNotification(title, body, type);
+        }
+      });
+    }
+  }
 
   // Initialize
   refresh();

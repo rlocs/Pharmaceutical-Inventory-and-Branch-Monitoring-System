@@ -43,7 +43,7 @@ CREATE TABLE Details (
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID)
 )ENGINE=InnoDB;
 
--- Table 3B: OTP Verification (For Password Reset)
+-- Table 4: OTP Verification (For Password Reset)
 CREATE TABLE OTPVerification (
     OTPID INT PRIMARY KEY AUTO_INCREMENT,
     UserID INT NOT NULL,
@@ -54,6 +54,7 @@ CREATE TABLE OTPVerification (
     AttemptCount INT DEFAULT 0,
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID) ON DELETE CASCADE
 )ENGINE=InnoDB;
+-- Table 5:
 CREATE TABLE Categories (
     CategoryID INT PRIMARY KEY AUTO_INCREMENT,
     CategoryName VARCHAR(50) UNIQUE NOT NULL,
@@ -61,109 +62,11 @@ CREATE TABLE Categories (
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Populate Categories table with existing category names from the old ENUM
-INSERT INTO Categories (CategoryName) VALUES
-('Analgesic'),
-('Antibiotic'),
-('Antiseptic'),
-('Antipyretic'),
-('Antihistamine'),
-('Antiviral'),
-('Antifungal'),
-('Cardiovascular'),
-('Cough and Cold'),
-('Diuretic'),
-('Gastrointestinal'),
-('Hormonal'),
-('Nutritional Supplement'),
-('Pain Relief'),
-('Respiratory'),
-('Sedative'),
-('Topical'),
-('Vaccine'),
-('Vitamin/Mineral'),
-('Other'),
-('Antacid'),
-('Antidiabetic'),
-('Antihypertensive'),
-('Cholesterol'),
-('Anticonvulsant'),
-('Thyroid'),
-('Antidepressant'),
-('Anticoagulant'),
-('Biologic'),
-('Urological'),
-('Erectile Dysfunction'),
-('Supplement'),
-('Sleep Aid'),
-('Cardio'),
-('Cough/Cold'),
-('Corticosteroid')
-ON DUPLICATE KEY UPDATE CategoryName = CategoryName;
 
 
-CREATE INDEX idx_chat_messages_conversation ON ChatMessages(ConversationID, Timestamp);
-CREATE INDEX idx_accounts_usercode ON Accounts(UserCode);
-
--- BranchInventory queries
-CREATE INDEX idx_branch_inventory_branchid ON BranchInventory(BranchID);
-CREATE INDEX idx_branch_inventory_medicineid ON BranchInventory(MedicineID);
-CREATE INDEX idx_branch_inventory_expiry ON BranchInventory(ExpiryDate);
-CREATE INDEX idx_branch_inventory_stocks ON BranchInventory(Stocks);
-
--- Accounts queries
-CREATE INDEX idx_accounts_branchid ON Accounts(BranchID);
-CREATE INDEX idx_accounts_role ON Accounts(Role);
-CREATE INDEX idx_accounts_status ON Accounts(AccountStatus);
-
--- Chat queries
-CREATE INDEX idx_chat_messages_conversation_timestamp ON ChatMessages(ConversationID, Timestamp);
-CREATE INDEX idx_chat_participants_userid ON ChatParticipants(UserID);
-CREATE INDEX idx_chat_participants_conversation ON ChatParticipants(ConversationID);
-
--- Transaction queries
-CREATE INDEX idx_sales_transactions_branchid_date ON SalesTransactions(BranchID, TransactionDateTime);
-CREATE INDEX idx_sales_transactions_userid ON SalesTransactions(UserID);
-CREATE INDEX idx_transaction_items_transactionid ON TransactionItems(TransactionID);
-
--- Ensure positive stock values
-ALTER TABLE BranchInventory 
-ADD CONSTRAINT chk_stocks_positive CHECK (Stocks >= 0);
-
--- Ensure positive prices
-ALTER TABLE BranchInventory 
-ADD CONSTRAINT chk_price_positive CHECK (Price >= 0);
-
--- Ensure positive quantities
-ALTER TABLE TransactionItems 
-ADD CONSTRAINT chk_quantity_positive CHECK (Quantity > 0);
-
--- Ensure positive subtotals
-ALTER TABLE TransactionItems 
-ADD CONSTRAINT chk_subtotal_positive CHECK (Subtotal >= 0);
-
--- Ensure valid expiry dates (not in past for new entries)
--- Note: This would need to be enforced at application level
--- or use a trigger
 
 
----Some tables lack audit information
-
--- Add to BranchInventory
-ALTER TABLE BranchInventory 
-ADD COLUMN CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-ADD COLUMN UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-ADD COLUMN CreatedBy INT,
-ADD COLUMN UpdatedBy INT,
-ADD FOREIGN KEY (CreatedBy) REFERENCES Accounts(UserID),
-ADD FOREIGN KEY (UpdatedBy) REFERENCES Accounts(UserID);
-
--- Add to SalesTransactions 
-ALTER TABLE SalesTransactions 
-ADD COLUMN UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
-
-
--- Table 4: medicines (Correct)
+-- Table 6:
 
 CREATE TABLE medicines (
     MedicineID INT AUTO_INCREMENT PRIMARY KEY,
@@ -176,7 +79,7 @@ CREATE TABLE medicines (
 )ENGINE=InnoDB;
 
 
--- Table 5: BranchInventory (Correct)
+-- Table 7: BranchInventory (Correct)
 CREATE TABLE BranchInventory (
     BranchInventoryID INT PRIMARY KEY AUTO_INCREMENT,
     BranchID INT NOT NULL,
@@ -192,20 +95,25 @@ CREATE TABLE BranchInventory (
     UNIQUE KEY idx_branch_med (BranchID, MedicineID) 
 )ENGINE=InnoDB;
 
--- Table 6: Transactions (POS Receipt Header)
+-- Existing Table 8: SalesTransactions (Modified to capture final tax/discount values)
 CREATE TABLE SalesTransactions (
-    TransactionID INT PRIMARY KEY AUTO_INCREMENT, -- Renamed PK
+    TransactionID INT PRIMARY KEY AUTO_INCREMENT,
     BranchID INT NOT NULL,
     UserID INT NOT NULL,
     TransactionDateTime DATETIME DEFAULT CURRENT_TIMESTAMP,
     TotalAmount DECIMAL(10, 2) NOT NULL,
     PaymentMethod ENUM('Cash', 'Card', 'Credit') NOT NULL,
-    CustomerName VARCHAR(100),
+    CustomerType ENUM('Regular', 'SeniorCitizen', 'PWD') DEFAULT 'Regular',
+    
+    -- New fields to record the final values applied for immutable history
+    TotalTaxAmount DECIMAL(10, 2) DEFAULT 0.00,
+    TotalDiscountAmount DECIMAL(10, 2) DEFAULT 0.00,
+    
     FOREIGN KEY (BranchID) REFERENCES Branches(BranchID),
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID)
 )ENGINE=InnoDB;
 
--- Table 7: TransactionItems (POS Receipt Details)
+-- Table 9: TransactionItems (POS Receipt Details)
 CREATE TABLE TransactionItems (
     TransactionItemID INT PRIMARY KEY AUTO_INCREMENT, 
     TransactionID INT NOT NULL, 
@@ -218,14 +126,14 @@ CREATE TABLE TransactionItems (
     FOREIGN KEY (BranchInventoryID) REFERENCES BranchInventory(BranchInventoryID) ON DELETE CASCADE
 )ENGINE=InnoDB;
 
--- Table 8: ChatConversations (Correct)
+-- Table 10: ChatConversations (Correct)
 CREATE TABLE ChatConversations (
     ConversationID INT PRIMARY KEY AUTO_INCREMENT,
     LastMessageTimestamp DATETIME,
     CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
 )ENGINE=InnoDB;
 
--- Table 9: ChatParticipants (Updated)
+-- Table 11: ChatParticipants (Updated)
 CREATE TABLE ChatParticipants ( 
     ParticipantID INT PRIMARY KEY AUTO_INCREMENT,
     ConversationID INT NOT NULL,
@@ -238,7 +146,7 @@ CREATE TABLE ChatParticipants (
     UNIQUE KEY (ConversationID, UserID) 
 )ENGINE=InnoDB;
 
--- Table 10: ChatMessages (Updated)
+-- Table 12: ChatMessages (Updated)
 CREATE TABLE ChatMessages (
     MessageID INT PRIMARY KEY AUTO_INCREMENT,
     ConversationID INT NOT NULL,
@@ -255,7 +163,7 @@ CREATE TABLE ChatMessages (
 -- *******************************************************************
 -- Notifications Table for Bell Notification System
 -- *******************************************************************
-
+-- Table 13:
 CREATE TABLE Notifications (
     NotificationID INT AUTO_INCREMENT PRIMARY KEY,
     UserID INT NULL,
@@ -305,7 +213,7 @@ CREATE TABLE Notifications (
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID)
 ) ENGINE=InnoDB;
 
--- NotificationReadState:
+-- Table 14:NotificationReadState:
 CREATE TABLE NotificationReadState (
     ReadID INT AUTO_INCREMENT PRIMARY KEY,
     NotificationID INT NOT NULL,
@@ -320,7 +228,7 @@ CREATE TABLE NotificationReadState (
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID)
 ) ENGINE=InnoDB;
 
---CalendarNotes table:
+-- Table 15:CalendarNotes table:
 CREATE TABLE CalendarNotes (
     NoteID INT AUTO_INCREMENT PRIMARY KEY,
     UserID INT NOT NULL,
@@ -331,30 +239,145 @@ CREATE TABLE CalendarNotes (
     FOREIGN KEY (UserID) REFERENCES Accounts(UserID),
     FOREIGN KEY (BranchID) REFERENCES Branches(BranchID)
 )ENGINE=InnoDB;
-
--- ToDoList table:
+ALTER TABLE CalendarNotes ADD UNIQUE KEY unique_note (UserID, BranchID, NoteDate);
+-- Table 16:ToDoList table:
 CREATE TABLE ToDoList (
-        TaskID INT AUTO_INCREMENT PRIMARY KEY,
-        UserID INT NOT NULL,
-        BranchID INT NOT NULL,
-        TaskText VARCHAR(255) NOT NULL,
-        IsDone TINYINT(1) DEFAULT 0,
-        CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (UserID) REFERENCES Accounts(UserID),
-        FOREIGN KEY (BranchID) REFERENCES Branches(BranchID)
+    TaskID INT AUTO_INCREMENT PRIMARY KEY,
+    UserID INT NOT NULL,
+    BranchID INT NOT NULL,
+    TaskText VARCHAR(255) NOT NULL,
+    IsDone TINYINT(1) DEFAULT 0,
+    CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (UserID) REFERENCES Accounts(UserID),
+    FOREIGN KEY (BranchID) REFERENCES Branches(BranchID)
 )ENGINE=InnoDB;
 
+CREATE TABLE TaxAndDiscountRules (
+    RuleID INT PRIMARY KEY AUTO_INCREMENT,
+    RuleName VARCHAR(100) UNIQUE NOT NULL, -- e.g., 'VAT Rate', 'Senior Citizen Discount', 'PWD Discount'
+    RuleType ENUM('Tax', 'Discount') NOT NULL,
+    ApplicableValue DECIMAL(5, 4) NOT NULL, -- Stored as a decimal (e.g., 0.12 for 12% VAT, 0.20 for 20% discount)
+    AppliesTo ENUM('All', 'CustomerType') DEFAULT 'All', -- Indicates if it's general or specific to a customer type
+    CustomerTypeTarget ENUM('Regular', 'SeniorCitizen', 'PWD', 'None') DEFAULT 'None', -- Links to customer types in SalesTransactions
+    IsActive TINYINT(1) DEFAULT 1,
+    EffectiveDate DATE NOT NULL,
+    ExpirationDate DATE NULL,
+    CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+)ENGINE=InnoDB;
 
---Remove this if you encounter error
-ALTER TABLE ChatMessages
-ADD BranchID INT NOT NULL AFTER SenderUserID;
+CREATE TABLE TransactionDiscounts (
+    TransactionDiscountID INT PRIMARY KEY AUTO_INCREMENT,
+    TransactionID INT NOT NULL,
+    RuleID INT NOT NULL, -- The specific discount/tax rule applied
+    AppliedValue DECIMAL(5, 4) NOT NULL, -- The percentage/rate applied (for history)
+    AmountDeducted DECIMAL(10, 2) NOT NULL, -- The actual monetary amount deducted
+    
+    FOREIGN KEY (TransactionID) REFERENCES SalesTransactions(TransactionID) ON DELETE CASCADE,
+    FOREIGN KEY (RuleID) REFERENCES TaxAndDiscountRules(RuleID),
+    UNIQUE KEY idx_transaction_rule (TransactionID, RuleID)
+)ENGINE=InnoDB;
 
-ALTER TABLE ChatMessages
-ADD FOREIGN KEY (BranchID) REFERENCES Branches(BranchID) ON DELETE CASCADE;
+CREATE INDEX idx_accounts_usercode ON Accounts(UserCode);
+
+-- BranchInventory queries
+CREATE INDEX idx_branch_inventory_branchid ON BranchInventory(BranchID);
+CREATE INDEX idx_branch_inventory_medicineid ON BranchInventory(MedicineID);
+CREATE INDEX idx_branch_inventory_expiry ON BranchInventory(ExpiryDate);
+CREATE INDEX idx_branch_inventory_stocks ON BranchInventory(Stocks);
+
+-- Accounts queries
+CREATE INDEX idx_accounts_branchid ON Accounts(BranchID);
+CREATE INDEX idx_accounts_role ON Accounts(Role);
+CREATE INDEX idx_accounts_status ON Accounts(AccountStatus);
+
+-- Chat queries
+CREATE INDEX idx_chat_messages_conversation_timestamp ON ChatMessages(ConversationID, Timestamp);
+CREATE INDEX idx_chat_participants_userid ON ChatParticipants(UserID);
+CREATE INDEX idx_chat_participants_conversation ON ChatParticipants(ConversationID);
+
+-- Transaction queries
+CREATE INDEX idx_sales_transactions_branchid_date ON SalesTransactions(BranchID, TransactionDateTime);
+CREATE INDEX idx_sales_transactions_userid ON SalesTransactions(UserID);
+CREATE INDEX idx_transaction_items_transactionid ON TransactionItems(TransactionID);
+
+-- Ensure positive stock values
+ALTER TABLE BranchInventory 
+ADD CONSTRAINT chk_stocks_positive CHECK (Stocks >= 0);
+
+-- Ensure positive prices
+ALTER TABLE BranchInventory 
+ADD CONSTRAINT chk_price_positive CHECK (Price >= 0);
+
+-- Ensure positive quantities
+ALTER TABLE TransactionItems 
+ADD CONSTRAINT chk_quantity_positive CHECK (Quantity > 0);
+
+-- Ensure positive subtotals
+ALTER TABLE TransactionItems 
+ADD CONSTRAINT chk_subtotal_positive CHECK (Subtotal >= 0);
+
+-- Ensure valid expiry dates (not in past for new entries)
+-- Note: This would need to be enforced at application level
+-- or use a trigger
+
+
+-- Some tables lack audit information
+-- Add to BranchInventory
+ALTER TABLE BranchInventory 
+ADD COLUMN CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ADD COLUMN CreatedBy INT,
+ADD COLUMN UpdatedBy INT,
+ADD FOREIGN KEY (CreatedBy) REFERENCES Accounts(UserID),
+ADD FOREIGN KEY (UpdatedBy) REFERENCES Accounts(UserID);
+
+-- Add to SalesTransactions 
+ALTER TABLE SalesTransactions 
+ADD COLUMN UpdatedAt DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+
 
 -- *******************************************************************
 -- 2. INSERT DATA
 -- *******************************************************************
+-- Populate Categories table with existing category names from the old ENUM
+INSERT INTO Categories (CategoryName) VALUES
+('Analgesic'),
+('Antibiotic'),
+('Antiseptic'),
+('Antipyretic'),
+('Antihistamine'),
+('Antiviral'),
+('Antifungal'),
+('Cardiovascular'),
+('Cough and Cold'),
+('Diuretic'),
+('Gastrointestinal'),
+('Hormonal'),
+('Nutritional Supplement'),
+('Pain Relief'),
+('Respiratory'),
+('Sedative'),
+('Topical'),
+('Vaccine'),
+('Vitamin/Mineral'),
+('Other'),
+('Antacid'),
+('Antidiabetic'),
+('Antihypertensive'),
+('Cholesterol'),
+('Anticonvulsant'),
+('Thyroid'),
+('Antidepressant'),
+('Anticoagulant'),
+('Biologic'),
+('Urological'),
+('Erectile Dysfunction'),
+('Supplement'),
+('Sleep Aid'),
+('Cardio'),
+('Cough/Cold'),
+('Corticosteroid')
+ON DUPLICATE KEY UPDATE CategoryName = CategoryName;
 
 -- BRANCH DATA
 INSERT INTO Branches (BranchName, BranchCode) VALUES 
@@ -571,7 +594,102 @@ INSERT INTO SalesTransactions (BranchID, UserID, TotalAmount, PaymentMethod) VAL
 (1, 2, 28.00, 'Card'),-- T17
 (1, 2, 3.50, 'Cash');-- T18 (Corrected Amount)
 
+-- BRANCH 2 DATA (UserID 3 - Abby Balambing)
+-- The BranchInventoryIDs are now 51-100 (e.g., Paracetamol=51, Losartan=55)
+-- Prices are based on Branch 2 inventory: Paracetamol(51)=3.60, Losartan(55)=7.10 (using the updated price of 7.10)
+
+-- 17 Transactions for Branch 2
+
+
+
+-- BRANCH 3 DATA (UserID 4 - Sopphie Pasta)
+-- The BranchInventoryIDs are now 101-150 (e.g., Paracetamol=101, Simvastatin=106, Ibuprofen=109)
+-- Prices are based on Branch 3 inventory: Paracetamol(101)=3.40, Simvastatin(106)=9.70, Ibuprofen(109)=4.65
+
+
+
+
 -- Insert Transaction Items for Branch 1 (T1-T18)
+
+
+INSERT INTO SalesTransactions (BranchID, UserID, TotalAmount, PaymentMethod) VALUES
+(2, 3, 7.20, 'Cash'),-- T19
+(2, 3, 3.60, 'Card'),-- T20
+(2, 3, 14.40, 'Cash'),-- T21
+(2, 3, 7.10, 'Cash'),-- T22 (Corrected Amount)
+(2, 3, 10.80, 'Card'),-- T23
+(2, 3, 35.50, 'Cash'),-- T24 (Corrected Amount)
+(2, 3, 3.60, 'Credit'), -- T25
+(2, 3, 7.20, 'Cash'),-- T26
+(2, 3, 14.20, 'Card'),-- T27 (Corrected Amount)
+(2, 3, 3.60, 'Cash'),-- T28
+(2, 3, 10.80, 'Cash'),-- T29
+(2, 3, 7.10, 'Card'),-- T30 (Corrected Amount)
+(2, 3, 18.00, 'Cash'),-- T31
+(2, 3, 7.20, 'Card'),-- T32
+(2, 3, 3.60, 'Cash'),-- T33
+(2, 3, 14.20, 'Credit'),-- T34 (Corrected Amount)
+(2, 3, 21.60, 'Cash');-- T35
+
+-- Insert Transaction Items for Branch 2 (T19-T35)
+INSERT INTO TransactionItems (TransactionID, BranchInventoryID, MedicineNameSnapshot, Quantity, PricePerUnit, Subtotal) VALUES
+(LAST_INSERT_ID() - 16, 51, 'Paracetamol 500mg', 2, 3.60, 7.20),
+(LAST_INSERT_ID() - 15, 51, 'Paracetamol 500mg', 1, 3.60, 3.60),
+(LAST_INSERT_ID() - 14, 51, 'Paracetamol 500mg', 4, 3.60, 14.40),
+(LAST_INSERT_ID() - 13, 55, 'Losartan Potassium 50mg', 1, 7.10, 7.10),
+(LAST_INSERT_ID() - 12, 51, 'Paracetamol 500mg', 3, 3.60, 10.80),
+(LAST_INSERT_ID() - 11, 55, 'Losartan Potassium 50mg', 5, 7.10, 35.50),
+(LAST_INSERT_ID() - 10, 51, 'Paracetamol 500mg', 1, 3.60, 3.60),
+(LAST_INSERT_ID() - 9, 51, 'Paracetamol 500mg', 2, 3.60, 7.20),
+(LAST_INSERT_ID() - 8, 55, 'Losartan Potassium 50mg', 2, 7.10, 14.20),
+(LAST_INSERT_ID() - 7, 51, 'Paracetamol 500mg', 1, 3.60, 3.60),
+(LAST_INSERT_ID() - 6, 51, 'Paracetamol 500mg', 3, 3.60, 10.80),
+(LAST_INSERT_ID() - 5, 55, 'Losartan Potassium 50mg', 1, 7.10, 7.10),
+(LAST_INSERT_ID() - 4, 51, 'Paracetamol 500mg', 5, 3.60, 18.00),
+(LAST_INSERT_ID() - 3, 51, 'Paracetamol 500mg', 2, 3.60, 7.20),
+(LAST_INSERT_ID() - 2, 51, 'Paracetamol 500mg', 1, 3.60, 3.60),
+(LAST_INSERT_ID() - 1, 55, 'Losartan Potassium 50mg', 2, 7.10, 14.20),
+(LAST_INSERT_ID(), 51, 'Paracetamol 500mg', 6, 3.60, 21.60);
+
+
+-- 15 Transactions for Branch 3
+INSERT INTO SalesTransactions (BranchID, UserID, TotalAmount, PaymentMethod) VALUES
+(3, 4, 6.80, 'Cash'),-- T36 (Corrected Amount)
+(3, 4, 9.70, 'Card'),-- T37 (Corrected Amount)
+(3, 4, 9.30, 'Cash'),-- T38 (Corrected Amount)
+(3, 4, 13.60, 'Credit'),-- T39 (Corrected Amount)
+(3, 4, 4.65, 'Cash'),-- T40 (Corrected Amount)
+(3, 4, 19.40, 'Card'),-- T41 (Corrected Amount)
+(3, 4, 3.40, 'Cash'),-- T42 (Corrected Amount)
+(3, 4, 13.95, 'Credit'),-- T43 (Corrected Amount)
+(3, 4, 20.40, 'Cash'),-- T44 (Corrected Amount)
+(3, 4, 9.70, 'Cash'),-- T45 (Corrected Amount)
+(3, 4, 4.65, 'Card'),-- T46 (Corrected Amount)
+(3, 4, 6.80, 'Credit'),-- T47 (Corrected Amount)
+(3, 4, 9.70, 'Cash'),-- T48 (Corrected Amount)
+(3, 4, 4.65, 'Card'),-- T49 (Corrected Amount)
+(3, 4, 3.40, 'Cash');-- T50 (Corrected Amount)
+
+
+-- Insert Transaction Items for Branch 3 (T36-T50)
+INSERT INTO TransactionItems (TransactionID, BranchInventoryID, MedicineNameSnapshot, Quantity, PricePerUnit, Subtotal) VALUES
+(LAST_INSERT_ID() - 14, 101, 'Paracetamol 500mg', 2, 3.40, 6.80),
+(LAST_INSERT_ID() - 13, 106, 'Simvastatin 20mg', 1, 9.70, 9.70),
+(LAST_INSERT_ID() - 12, 109, 'Ibuprofen 400mg', 2, 4.65, 9.30),
+(LAST_INSERT_ID() - 11, 101, 'Paracetamol 500mg', 4, 3.40, 13.60),
+(LAST_INSERT_ID() - 10, 109, 'Ibuprofen 400mg', 1, 4.65, 4.65),
+(LAST_INSERT_ID() - 9, 106, 'Simvastatin 20mg', 2, 9.70, 19.40),
+(LAST_INSERT_ID() - 8, 101, 'Paracetamol 500mg', 1, 3.40, 3.40),
+(LAST_INSERT_ID() - 7, 109, 'Ibuprofen 400mg', 3, 4.65, 13.95),
+(LAST_INSERT_ID() - 6, 101, 'Paracetamol 500mg', 6, 3.40, 20.40),
+(LAST_INSERT_ID() - 5, 106, 'Simvastatin 20mg', 1, 9.70, 9.70),
+(LAST_INSERT_ID() - 4, 109, 'Ibuprofen 400mg', 1, 4.65, 4.65),
+(LAST_INSERT_ID() - 3, 101, 'Paracetamol 500mg', 2, 3.40, 6.80),
+(LAST_INSERT_ID() - 2, 106, 'Simvastatin 20mg', 1, 9.70, 9.70),
+(LAST_INSERT_ID() - 1, 109, 'Ibuprofen 400mg', 1, 4.65, 4.65),
+(LAST_INSERT_ID(), 101, 'Paracetamol 500mg', 1, 3.40, 3.40);
+
+
 INSERT INTO TransactionItems (TransactionID, BranchInventoryID, MedicineNameSnapshot, Quantity, PricePerUnit, Subtotal) VALUES
 (LAST_INSERT_ID() - 17, 1, 'Paracetamol 500mg', 2, 3.50, 7.00),
 (LAST_INSERT_ID() - 16, 3, 'Cotrimoxazole Syrup 240mg/5mL', 1, 8.25, 8.25),
@@ -598,92 +716,6 @@ INSERT INTO TransactionItems (TransactionID, BranchInventoryID, MedicineNameSnap
 (LAST_INSERT_ID() - 1, 1, 'Paracetamol 500mg', 8, 3.50, 28.00),
 -- T18: One item (Paracetamol)
 (LAST_INSERT_ID(), 1, 'Paracetamol 500mg', 1, 3.50, 3.50);
-
-
--- BRANCH 2 DATA (UserID 3 - Abby Balambing)
--- The BranchInventoryIDs are now 51-100 (e.g., Paracetamol=51, Losartan=55)
--- Prices are based on Branch 2 inventory: Paracetamol(51)=3.60, Losartan(55)=7.10 (using the updated price of 7.10)
-
--- 17 Transactions for Branch 2
-INSERT INTO SalesTransactions (BranchID, UserID, TotalAmount, PaymentMethod, CustomerName) VALUES
-(2, 3, 7.20, 'Cash', 'Jane Doe'),-- T19
-(2, 3, 3.60, 'Card', 'John Smith'),-- T20
-(2, 3, 14.40, 'Cash', NULL),-- T21
-(2, 3, 7.10, 'Cash', 'Lisa Ray'),-- T22 (Corrected Amount)
-(2, 3, 10.80, 'Card', NULL),-- T23
-(2, 3, 35.50, 'Cash', 'Mike Chen'),-- T24 (Corrected Amount)
-(2, 3, 3.60, 'Credit', NULL), -- T25
-(2, 3, 7.20, 'Cash', 'Sarah Connor'),-- T26
-(2, 3, 14.20, 'Card', NULL),-- T27 (Corrected Amount)
-(2, 3, 3.60, 'Cash', 'Alex Du'),-- T28
-(2, 3, 10.80, 'Cash', NULL),-- T29
-(2, 3, 7.10, 'Card', 'Ben Jones'),-- T30 (Corrected Amount)
-(2, 3, 18.00, 'Cash', NULL),-- T31
-(2, 3, 7.20, 'Card', 'Cathy Lee'),-- T32
-(2, 3, 3.60, 'Cash', NULL),-- T33
-(2, 3, 14.20, 'Credit', 'David Kim'),-- T34 (Corrected Amount)
-(2, 3, 21.60, 'Cash', NULL);-- T35
-
--- Insert Transaction Items for Branch 2 (T19-T35)
-INSERT INTO TransactionItems (TransactionID, BranchInventoryID, MedicineNameSnapshot, Quantity, PricePerUnit, Subtotal) VALUES
-(LAST_INSERT_ID() - 16, 51, 'Paracetamol 500mg', 2, 3.60, 7.20),
-(LAST_INSERT_ID() - 15, 51, 'Paracetamol 500mg', 1, 3.60, 3.60),
-(LAST_INSERT_ID() - 14, 51, 'Paracetamol 500mg', 4, 3.60, 14.40),
-(LAST_INSERT_ID() - 13, 55, 'Losartan Potassium 50mg', 1, 7.10, 7.10),
-(LAST_INSERT_ID() - 12, 51, 'Paracetamol 500mg', 3, 3.60, 10.80),
-(LAST_INSERT_ID() - 11, 55, 'Losartan Potassium 50mg', 5, 7.10, 35.50),
-(LAST_INSERT_ID() - 10, 51, 'Paracetamol 500mg', 1, 3.60, 3.60),
-(LAST_INSERT_ID() - 9, 51, 'Paracetamol 500mg', 2, 3.60, 7.20),
-(LAST_INSERT_ID() - 8, 55, 'Losartan Potassium 50mg', 2, 7.10, 14.20),
-(LAST_INSERT_ID() - 7, 51, 'Paracetamol 500mg', 1, 3.60, 3.60),
-(LAST_INSERT_ID() - 6, 51, 'Paracetamol 500mg', 3, 3.60, 10.80),
-(LAST_INSERT_ID() - 5, 55, 'Losartan Potassium 50mg', 1, 7.10, 7.10),
-(LAST_INSERT_ID() - 4, 51, 'Paracetamol 500mg', 5, 3.60, 18.00),
-(LAST_INSERT_ID() - 3, 51, 'Paracetamol 500mg', 2, 3.60, 7.20),
-(LAST_INSERT_ID() - 2, 51, 'Paracetamol 500mg', 1, 3.60, 3.60),
-(LAST_INSERT_ID() - 1, 55, 'Losartan Potassium 50mg', 2, 7.10, 14.20),
-(LAST_INSERT_ID(), 51, 'Paracetamol 500mg', 6, 3.60, 21.60);
-
-
--- BRANCH 3 DATA (UserID 4 - Sopphie Pasta)
--- The BranchInventoryIDs are now 101-150 (e.g., Paracetamol=101, Simvastatin=106, Ibuprofen=109)
--- Prices are based on Branch 3 inventory: Paracetamol(101)=3.40, Simvastatin(106)=9.70, Ibuprofen(109)=4.65
-
--- 15 Transactions for Branch 3
-INSERT INTO SalesTransactions (BranchID, UserID, TotalAmount, PaymentMethod) VALUES
-(3, 4, 6.80, 'Cash'),-- T36 (Corrected Amount)
-(3, 4, 9.70, 'Card'),-- T37 (Corrected Amount)
-(3, 4, 9.30, 'Cash'),-- T38 (Corrected Amount)
-(3, 4, 13.60, 'Credit'),-- T39 (Corrected Amount)
-(3, 4, 4.65, 'Cash'),-- T40 (Corrected Amount)
-(3, 4, 19.40, 'Card'),-- T41 (Corrected Amount)
-(3, 4, 3.40, 'Cash'),-- T42 (Corrected Amount)
-(3, 4, 13.95, 'Credit'),-- T43 (Corrected Amount)
-(3, 4, 20.40, 'Cash'),-- T44 (Corrected Amount)
-(3, 4, 9.70, 'Cash'),-- T45 (Corrected Amount)
-(3, 4, 4.65, 'Card'),-- T46 (Corrected Amount)
-(3, 4, 6.80, 'Credit'),-- T47 (Corrected Amount)
-(3, 4, 9.70, 'Cash'),-- T48 (Corrected Amount)
-(3, 4, 4.65, 'Card'),-- T49 (Corrected Amount)
-(3, 4, 3.40, 'Cash');-- T50 (Corrected Amount)
-
--- Insert Transaction Items for Branch 3 (T36-T50)
-INSERT INTO TransactionItems (TransactionID, BranchInventoryID, MedicineNameSnapshot, Quantity, PricePerUnit, Subtotal) VALUES
-(LAST_INSERT_ID() - 14, 101, 'Paracetamol 500mg', 2, 3.40, 6.80),
-(LAST_INSERT_ID() - 13, 106, 'Simvastatin 20mg', 1, 9.70, 9.70),
-(LAST_INSERT_ID() - 12, 109, 'Ibuprofen 400mg', 2, 4.65, 9.30),
-(LAST_INSERT_ID() - 11, 101, 'Paracetamol 500mg', 4, 3.40, 13.60),
-(LAST_INSERT_ID() - 10, 109, 'Ibuprofen 400mg', 1, 4.65, 4.65),
-(LAST_INSERT_ID() - 9, 106, 'Simvastatin 20mg', 2, 9.70, 19.40),
-(LAST_INSERT_ID() - 8, 101, 'Paracetamol 500mg', 1, 3.40, 3.40),
-(LAST_INSERT_ID() - 7, 109, 'Ibuprofen 400mg', 3, 4.65, 13.95),
-(LAST_INSERT_ID() - 6, 101, 'Paracetamol 500mg', 6, 3.40, 20.40),
-(LAST_INSERT_ID() - 5, 106, 'Simvastatin 20mg', 1, 9.70, 9.70),
-(LAST_INSERT_ID() - 4, 109, 'Ibuprofen 400mg', 1, 4.65, 4.65),
-(LAST_INSERT_ID() - 3, 101, 'Paracetamol 500mg', 2, 3.40, 6.80),
-(LAST_INSERT_ID() - 2, 106, 'Simvastatin 20mg', 1, 9.70, 9.70),
-(LAST_INSERT_ID() - 1, 109, 'Ibuprofen 400mg', 1, 4.65, 4.65),
-(LAST_INSERT_ID(), 101, 'Paracetamol 500mg', 1, 3.40, 3.40);
 
 -- No need for separate UPDATE statements, as I've fixed the TotalAmount values in the INSERTs above.
 -- The previous T7, T10, T11, T12, T16, T18 logic is now baked into the INSERTs for TransactionID 1 through 18.
@@ -910,7 +942,6 @@ BEGIN
     SELECT v_ConversationID AS ConversationID;
 END //
 
-DELIMITER //
 
 -- Stored Procedure to Get Alerts for a Branch
 CREATE PROCEDURE SP_GetAlerts (
@@ -947,6 +978,76 @@ BEGIN
         m.MedicineName;
 END //
 
-DELIMITER ;
 
+-- Stored Procedure to Get Calendar Notes for a User and Branch within a Date Range
+CREATE PROCEDURE SP_GetCalendarNotes (
+    IN p_UserID INT,
+    IN p_BranchID INT,
+    IN p_StartDate DATE,
+    IN p_EndDate DATE
+)
+BEGIN
+    SELECT NoteID, NoteDate, NoteText, CreatedAt
+    FROM CalendarNotes
+    WHERE UserID = p_UserID
+      AND BranchID = p_BranchID
+      AND NoteDate BETWEEN p_StartDate AND p_EndDate
+    ORDER BY NoteDate ASC;
+END //
+
+-- Stored Procedure to Save (Insert or Update) a Calendar Note
+CREATE PROCEDURE SP_SaveCalendarNote (
+    IN p_UserID INT,
+    IN p_BranchID INT,
+    IN p_NoteDate DATE,
+    IN p_NoteText TEXT
+)
+BEGIN
+    -- If note exists, update; else insert
+    INSERT INTO CalendarNotes (UserID, BranchID, NoteDate, NoteText)
+    VALUES (p_UserID, p_BranchID, p_NoteDate, p_NoteText)
+    ON DUPLICATE KEY UPDATE NoteText = p_NoteText, CreatedAt = CURRENT_TIMESTAMP;
+END //
+
+-- Stored Procedure to Delete a Calendar Note by NoteID
+CREATE PROCEDURE SP_DeleteCalendarNote (
+    IN p_NoteID INT,
+    IN p_UserID INT
+)
+BEGIN
+    DELETE FROM CalendarNotes
+    WHERE NoteID = p_NoteID AND UserID = p_UserID;
+END //
+
+
+
+-- 1. Get all tasks for the user
+CREATE PROCEDURE SP_GetToDoList(IN p_UserID INT, IN p_BranchID INT)
+BEGIN
+    SELECT TaskID, TaskText, IsDone, CreatedAt
+    FROM ToDoList
+    WHERE UserID = p_UserID AND BranchID = p_BranchID
+    ORDER BY CreatedAt DESC;
+END //
+
+-- 2. Add a new task
+CREATE PROCEDURE SP_AddToDoItem(IN p_UserID INT, IN p_BranchID INT, IN p_TaskText VARCHAR(255))
+BEGIN
+    INSERT INTO ToDoList (UserID, BranchID, TaskText)
+    VALUES (p_UserID, p_BranchID, p_TaskText);
+END //
+
+-- 3. Delete a task
+CREATE PROCEDURE SP_DeleteToDoItem(IN p_TaskID INT, IN p_UserID INT)
+BEGIN
+    DELETE FROM ToDoList WHERE TaskID = p_TaskID AND UserID = p_UserID;
+END //
+
+-- 4. Toggle Task Status (Done/Not Done)
+CREATE PROCEDURE SP_ToggleToDoItem(IN p_TaskID INT, IN p_UserID INT, IN p_IsDone TINYINT)
+BEGIN
+    UPDATE ToDoList SET IsDone = p_IsDone WHERE TaskID = p_TaskID AND UserID = p_UserID;
+END //
+
+DELIMITER ;
 

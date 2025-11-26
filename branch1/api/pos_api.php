@@ -33,7 +33,10 @@ try {
         $items = $input['items'];
         $total_amount = $input['total_amount'];
         $payment_method = $input['payment_method'];
-        $customer_name = isset($input['customer_name']) ? trim($input['customer_name']) : null;
+        $raw_total = isset($input['raw_total']) ? $input['raw_total'] : null;
+        $discount_amount = isset($input['discount_amount']) ? $input['discount_amount'] : 0;
+        $vat_amount = isset($input['vat_amount']) ? $input['vat_amount'] : 0;
+        $discount_type = isset($input['discount_type']) ? $input['discount_type'] : 'regular';
 
         // Validate payment method
         $valid_payment_methods = ['Cash', 'Card', 'Credit'];
@@ -47,14 +50,20 @@ try {
         $conn->beginTransaction();
 
         // Insert into SalesTransactions
-        $sqlHeader = "INSERT INTO SalesTransactions (BranchID, UserID, TotalAmount, PaymentMethod, CustomerName)
-                      VALUES (:branch_id, :user_id, :total_amount, :payment_method, :customer_name)";
+        $sqlHeader = "INSERT INTO SalesTransactions (BranchID, UserID, TotalAmount, PaymentMethod, CustomerType, TotalTaxAmount, TotalDiscountAmount)
+                  VALUES (:branch_id, :user_id, :total_amount, :payment_method, :customer_type, :tax_amount, :discount_amount)";
         $stmtHeader = $conn->prepare($sqlHeader);
         $stmtHeader->bindValue(':branch_id', $_SESSION['branch_id'], PDO::PARAM_INT);
         $stmtHeader->bindValue(':user_id', $_SESSION['user_id'], PDO::PARAM_INT);
         $stmtHeader->bindValue(':total_amount', $total_amount);
         $stmtHeader->bindValue(':payment_method', $payment_method);
-        $stmtHeader->bindValue(':customer_name', $customer_name);
+        // Map discount types to CustomerType enum values
+        $customerType = 'Regular';
+        if (strtolower($discount_type) === 'senior' || strtolower($discount_type) === 'seniorcitizen') $customerType = 'SeniorCitizen';
+        if (strtolower($discount_type) === 'pwd') $customerType = 'PWD';
+        $stmtHeader->bindValue(':customer_type', $customerType);
+        $stmtHeader->bindValue(':tax_amount', $vat_amount);
+        $stmtHeader->bindValue(':discount_amount', $discount_amount);
         $stmtHeader->execute();
 
         $transactionID = $conn->lastInsertId();
