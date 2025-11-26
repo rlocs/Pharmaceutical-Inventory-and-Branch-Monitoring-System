@@ -107,7 +107,7 @@ $top_sellers = $top_sellers_stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // 6. Recent Transactions
 $recent_trans_stmt = $conn->prepare("
-    SELECT TransactionID, TransactionDateTime, TotalAmount, PaymentMethod, CustomerName
+    SELECT TransactionID, TransactionDateTime, TotalAmount, PaymentMethod
     FROM SalesTransactions
     WHERE BranchID = ?
     ORDER BY TransactionDateTime DESC
@@ -879,7 +879,6 @@ $unread_messages = $unread_messages_stmt->fetch(PDO::FETCH_ASSOC)['unread_convs'
                                                 <td><?php echo date('M d, Y H:i', strtotime($trans['TransactionDateTime'])); ?></td>
                                                 <td><strong>₱<?php echo number_format($trans['TotalAmount'], 2); ?></strong></td>
                                                 <td><span class="badge badge-info"><?php echo htmlspecialchars($trans['PaymentMethod']); ?></span></td>
-                                                <td><?php echo htmlspecialchars($trans['CustomerName'] ?? 'Walk-in'); ?></td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
