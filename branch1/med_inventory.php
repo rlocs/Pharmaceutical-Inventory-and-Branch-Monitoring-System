@@ -1,7 +1,7 @@
 <?php
 // Start the session on every page
 session_start();
-
+require_once '../dbconnection.php';
 // ------------------------------------------------------------------
 // ACCESS CONTROL CHECK
 // ------------------------------------------------------------------
@@ -48,7 +48,7 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
 // DATABASE CONNECTION AND DATA FETCHING
 // ------------------------------------------------------------------
 
-require_once '../dbconnection.php';
+
 
 try {
     $db = new Database();
@@ -153,6 +153,8 @@ function escapeHtml($text) {
     
     <!-- Load Lucide icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Load SweetAlert2 library from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/chat_window.css?v=<?php echo time(); ?>">
     <script>
@@ -196,7 +198,7 @@ function escapeHtml($text) {
         </header>
 
         <!-- 2. SECONDARY NAVIGATION BAR (Light Cream/White) -->
-        <nav class="bg-white border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
+        <nav class="bg-[#F4F6FA] border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
             
             <!-- Navigation Links - INCREASED TEXT SIZE to text-base -->
             <div class="flex space-x-8 text-base font-medium">
@@ -220,9 +222,7 @@ function escapeHtml($text) {
                 <h2 id="page-title" class="text-4xl font-extrabold text-gray-900 mb-4">
                     Medicine Inventory
                 </h2>
-                <p class="text-gray-600 text-lg mb-8">
-                    View and manage medicine stock for <?php echo $branch_name; ?>.
-                </p>
+                <p class="text-gray-600 text-lg mb-8"></p>
 
                 <!-- Alert Banners -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -296,20 +296,20 @@ function escapeHtml($text) {
                     </div>
                 </div>
 
-                <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
+                <div class="bg-[#F4F6FA] p-6 rounded-3xl shadow-lg border border-gray-100">
                     <!-- Toolbar: Search, Category Filter and Add Button -->
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0">
                         <div class="flex flex-col md:flex-row w-full md:w-2/3 gap-4">
                             <!-- Search Bar -->
                             <div class="relative w-full md:w-1/3">
-                                <input type="text" id="searchInput" placeholder="Search medicines..." class="w-full py-2 pl-10 pr-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent bg-white">
+                                <input type="text" id="searchInput" placeholder="Search medicines..." class="w-full py-2 pl-10 pr-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent bg-[#F4F6FA]">
                                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                     <i data-lucide="search" class="h-5 w-5 text-gray-400"></i>
                                 </div>
                             </div>
                             <!-- Category Filter -->
                             <div class="relative w-full md:w-1/3">
-                                <select id="categoryFilter" class="w-full py-2 pl-4 pr-8 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent appearance-none bg-white">
+                                <select id="categoryFilter" class="w-full py-2 pl-4 pr-8 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent appearance-none bg-[#F4F6FA]">
                                     <option value="">All Categories</option>
                                     <?php foreach ($categories as $category): ?>
                                         <option value="<?php echo escapeHtml($category['CategoryName']); ?>"><?php echo escapeHtml($category['CategoryName']); ?></option>
@@ -329,7 +329,7 @@ function escapeHtml($text) {
 
                     <!-- Inventory Table -->
                     <div class="overflow-x-auto">
-                        <table class="min-w-full bg-white border-separate" style="border-spacing: 0 0.5rem;">
+                        <table class="min-w-full bg-[#F4F6FA] border-separate" style="border-spacing: 0 0.5rem;">
                             <thead class="bg-gray-100">
                                 <tr>
                                     <th class="text-left py-3 px-4 font-semibold text-sm text-gray-600 uppercase tracking-wider rounded-l-lg">Medicine</th>

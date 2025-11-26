@@ -1,0 +1,316 @@
+/* --- General Layout and Containers --- */
+/* --- Layout Grid --- */
+    .container {
+        display: grid;
+        grid-template-columns: 2.5fr 1.4fr 1.1fr; /* Adjusted ratios for better spacing */
+        gap: 20px;
+        height: calc(100vh - 140px); /* Full height minus header/nav */
+    }
+
+    /* --- Panels --- */
+    .pos-panel {
+        background: #F4F6FA;
+        border-radius: 16px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        border: 1px solid #f3f4f6;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        height: 100%;
+    }
+
+    /* --- Medicine Grid (Left) --- */
+    #med-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); /* Responsive cards */
+        gap: 12px;
+        overflow-y: auto;
+        padding: 12px;
+        /* Custom Scrollbar */
+        scrollbar-width: thin;
+        scrollbar-color: #F4F6FA transparent;
+    }
+
+    /* --- Order Table (Center) --- */
+    .order-scroll-area {
+        flex-grow: 1;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+    
+    /* --- Numpad (Right) --- */
+    .numpad-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        flex-grow: 1;
+    }
+    
+    /* --- Active Input Highlight --- */
+    .input-active {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15) !important;
+        background-color: #eff6ff !important;
+    }
+
+    /* Hide Number Spinners */
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+        -webkit-appearance: none; 
+        margin: 0; 
+    }
+
+
+.main-pos-height {
+    height: 70vh;
+    border-radius: 8px;
+    padding: 10px;
+    box-sizing: border-box;
+    background-color: #f7f7f7;
+    display: flex;
+    flex-direction: column;
+}
+
+/* --- Left Panel: Medicine List (2.5fr) --- */
+#search {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 0.9em;
+}
+
+#med-list.grid {
+    /* FIX: Set to 3 columns wide */
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    flex-grow: 1;
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Medicine Card Styling */
+.med {
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
+    padding: 8px 4px;
+    border-radius: 6px;
+    box-shadow: none;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.med:hover {
+    background-color: #eff6ff;
+    border-color: #93c5fd;
+}
+.card-name {
+    font-weight: 600;
+    margin-bottom: 2px;
+    font-size: 0.85em;
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.card-price {
+    color: #10b981;
+    font-size: 0.95em;
+    font-weight: 700;
+}
+
+/* --- Center Panel: Order List (1.5fr) --- */
+.center-panel h1 {
+    font-size: 1.3em;
+    font-weight: bold;
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #3b82f6;
+}
+
+.order-table-container {
+    /* Allows table to grow to fill space above total */
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+}
+
+
+#order-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+#order-table th, #order-table td {
+    padding: 8px 6px;
+    text-align: left;
+}
+
+#order-table thead th {
+    background-color: #e5e7eb;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    border-bottom: 2px solid #3b82f6;
+}
+
+/* Fixed column widths */
+#order-table thead tr th:nth-child(1),
+#order-table tbody tr td:nth-child(1) {
+    width: 20%; /* Slightly wider QTY */
+    text-align: center;
+    font-size: 1.0em;
+}
+
+#order-table thead tr th:nth-child(3),
+#order-table tbody tr td:nth-child(3) {
+    width: 35%; /* Wider amount field */
+    text-align: right;
+    font-size: 1.0em;
+}
+
+#order-table thead tr th:nth-child(2),
+#order-table tbody tr td:nth-child(2) {
+    width: 45%;
+    text-align: left;
+}
+
+#order-table tbody tr {
+    cursor: pointer;
+}
+#order-table tbody tr:hover {
+    background-color: #ffdddd;
+}
+
+
+/* Total Row (Fixed at the bottom of the center panel) */
+.total-row {
+    font-size: 1.3em; /* Larger total font */
+    font-weight: bold;
+    margin: 5px 0;
+    padding: 5px 0;
+    text-align: right;
+    color: #1f2937;
+    border-top: 1px solid #d1d5db; /* Separator line */
+}
+.total-row span {
+    color: #ef4444;
+}
+
+/* Action Buttons GRID for side-by-side layout (Center Panel) */
+.action-buttons-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 2px solid #3b82f6; /* Emphasize checkout action */
+}
+
+#clear-order, #checkout {
+    padding: 10px;
+    border-radius: 6px;
+    border: none;
+    font-weight: bold;
+    width: 100%;
+    cursor: pointer;
+    display: block;
+}
+
+#clear-order { background-color: #ef4444; color: white; }
+#checkout { background-color:  #22c55e; color: white; }
+#checkout:disabled { background-color: #93c5fd; cursor: not-allowed; opacity: 0.7; }
+
+/* --- Right Panel: Numpad/Payment (1fr) --- */
+.right-panel h1 {
+    font-size: 1.3em;
+    font-weight: bold;
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #3b82f6;
+}
+
+.numpad-area {
+    flex-grow: 1; /* Allows numpad area to take up the remaining space */
+    border: 1px solid #9ca3af;
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 5px;
+}
+
+/* Payment and Change display */
+.payment-area, .change-area {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+    font-weight: bold;
+    padding: 5px 0;
+}
+.change-area span {
+    font-size: 1.2em; /* Emphasize change */
+}
+
+/* QTY control area is now just for input/confirm */
+.qty-control {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #d1d5db;
+}
+
+
+#qty_input {
+    width: 55%; /* Adjusted width */
+    padding: 6px 8px;
+    border: 1px solid #9ca3af;
+    border-radius: 6px;
+    text-align: right;
+    font-size: 1.0em;
+    background-color: white;
+}
+#confirm_qty {
+    padding: 8px 15px; /* Smaller button for the right panel */
+    background-color: #22c55e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+#payment {
+    width: 65%;
+    padding: 6px 8px;
+    border: 1px solid #9ca3af;
+    border-radius: 6px;
+    text-align: right;
+    font-size: 1.0em;
+    background-color: white;
+}
+
+.numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    max-width: 200px; /* Keep numpad compact */
+    margin: 10px auto 0;
+}
+.numpad button {
+    padding: 12px;
+    font-size: 1.0em;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background-color: #f9fafb;
+    cursor: pointer;
+}
+.numpad button:hover {
+    background-color: #e5e7eb;
+}
+.numpad button[data-num="X"] { background-color: #fecaca; color: #dc2626; font-weight: bold; }
+.numpad button[data-num="✓"] { background-color: #d1fae5; color: #059669; font-weight: bold; }
