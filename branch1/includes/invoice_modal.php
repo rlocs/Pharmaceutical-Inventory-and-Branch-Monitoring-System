@@ -50,22 +50,6 @@
 
             <!-- Receipt Totals -->
             <div class="border-t-2 border-dashed border-gray-800 pt-2 space-y-1">
-                <div class="flex justify-between text-xs text-gray-600">
-                    <span>Discount Type</span>
-                    <span id="invoiceDiscountType">Regular</span>
-                </div>
-                <div class="flex justify-between text-xs text-gray-600">
-                    <span>Discount</span>
-                    <span id="invoiceDiscountAmount">₱0.00</span>
-                </div>
-                <div class="flex justify-between text-xs text-gray-600">
-                    <span>VAT</span>
-                    <span id="invoiceVatAmount">₱0.00</span>
-                </div>
-                <div class="flex justify-between text-xs text-gray-600">
-                    <span>Subtotal</span>
-                    <span id="invoiceRawTotal">₱0.00</span>
-                </div>
                 <div class="flex justify-between font-bold text-lg items-end">
                     <span>TOTAL</span>
                     <span id="invoiceTotalAmount" class="text-xl"></span>
@@ -195,10 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Populate Money
         const fmt = (num) => '₱' + parseFloat(num || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-        safeSetText('invoiceRawTotal', fmt(data.raw_total));
-        safeSetText('invoiceDiscountAmount', fmt(data.discount_amount));
-        safeSetText('invoiceVatAmount', fmt(data.vat_amount));
-        safeSetText('invoiceDiscountType', (data.discount_type || 'regular'));
         safeSetText('invoiceTotalAmount', fmt(data.total_amount));
         safeSetText('invoicePaymentAmount', fmt(data.payment_amount));
         safeSetText('invoiceChangeAmount', fmt(data.change_amount));
@@ -236,14 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 email: email,
                 transaction_id: currentInvoiceData.transaction_id,
                 items: currentInvoiceData.items,
-                total_amount: currentInvoiceData.total_amount,
-                raw_total: currentInvoiceData.raw_total,
-                discount_amount: currentInvoiceData.discount_amount,
-                vat_amount: currentInvoiceData.vat_amount,
-                discount_type: currentInvoiceData.discount_type,
-                payment_amount: currentInvoiceData.payment_amount,
-                change_amount: currentInvoiceData.change_amount,
-                payment_method: currentInvoiceData.payment_method,
+                total: currentInvoiceData.total_amount,
                 date: new Date().toLocaleString()
             };
 

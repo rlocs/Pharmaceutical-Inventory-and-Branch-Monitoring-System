@@ -1,0 +1,17 @@
+# NTFY Configuration
+# Copy this file to ntfy_enabled.txt to enable ntfy notifications
+# Or set environment variables:
+# NTFY_ENABLED=true
+# NTFY_SERVER=https://ntfy.sh (or your self-hosted instance)
+# NTFY_TOPIC=pharma-notifications (or user-specific topic)
+
+# To enable ntfy, create a file named "ntfy_enabled.txt" in this directory
+# Or set the NTFY_ENABLED environment variable to "true"
+
+# Example: For self-hosted ntfy server
+# NTFY_SERVER=http://your-ntfy-server.com
+# NTFY_TOPIC=pharma-alerts
+
+# Example: For user-specific topics (recommended)
+# NTFY_TOPIC=pharma-user-{USERID}
+

@@ -128,37 +128,7 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
                     Reports 
                 </h2>
                 <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">Branch <?php echo $current_branch_id; ?> Repository</h2>
-                <div class="mb-4 text-gray-700 font-semibold">
-                    <input type="text" id="date-picker" class="input-control date-box flatpickr-input active" placeholder="Filter by Date" readonly="readonly">
-                </div>
-                <div class="flex flex-wrap items-center justify-between mb-6 gap-4">
-                    <div class="flex items-center space-x-2">
-                        <label for="searchOrderId" class="text-gray-600 font-medium">Search Order ID:</label>
-                        <input type="text" id="searchOrderId" name="searchOrderId" placeholder="e.g., 1024" class="border border-gray-300 rounded px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-600">
-                        <button id="refreshBtn" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-1 shadow transition duration-150">Refresh</button>
-                    </div>
-                    <button id="exportCsvBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-4 py-1 shadow transition duration-150">
-                        Export CSV
-                    </button>
-                </div>
-                <div class="overflow-x-auto border border-gray-300 rounded-lg shadow-sm">
-                    <table class="min-w-full bg-white text-sm text-left text-gray-900">
-                        <thead class="bg-gray-100 text-gray-600 uppercase font-semibold">
-                            <tr>
-                                <th class="px-4 py-3 border-b border-gray-300">Order ID</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Date &amp; Time</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Items Count</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Payment</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Total Amount</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Receipt Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="repositoryTableBody">
-                            <!-- Dynamic Rows will be inserted here by JS -->
-                        </tbody>
-                    </table>
-                </div>
+                <p class="text-center text-gray-500">Reports interface coming soon...</p>
             </div>
 
         </main>
@@ -166,9 +136,7 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
     </div>
 
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
-    <script src="js/report_table.js"></script>
     <!-- Combined JavaScript Logic (from script.js and inline functions) -->
-
     <script src="js/chat.js?v=<?php echo time(); ?>"></script>
         <script src="js/notifications_bell.js" defer></script>
         <script src="js/script.js"></script>
