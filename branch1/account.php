@@ -219,7 +219,7 @@ try {
         </header>
 
         <!-- 2. SECONDARY NAVIGATION BAR (Light Cream/White) -->
-        <nav class="bg-white border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
+        <nav class="bg-[#F4F6FA] border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
             
             <!-- Navigation Links - INCREASED TEXT SIZE to text-base -->
             <div class="flex space-x-8 text-base font-medium">
@@ -263,7 +263,7 @@ try {
                 <div class="space-y-8">
 
                     <!-- TOP SECTION: FULL-WIDTH USER PROFILE -->
-                    <div class="bg-white p-6 md:p-8 rounded-xl shadow-lg">
+                    <div class="bg-[#F4F6FA] p-6 md:p-8 rounded-xl shadow-lg">
                         <h3 class="text-3xl font-extrabold text-indigo-700 mb-6 border-b pb-2">User Profile</h3>
                         <div class="flex items-center space-x-6">
                             <!-- Avatar/Placeholder -->
@@ -287,7 +287,7 @@ try {
                         </div>
 
                         <!-- Key Employment Details -->
-                        <div class="mt-6 border-t pt-4 grid grid-cols-1 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm">
+                        <div class="mt-6 border-t pt-4 grid grid-cols-1 sm:grid-cols-3 gap-y-4 gap-x-6 text-sm ">
                             <div>
                                 <p class="text-gray-500">Branch Name & Code</p>
                                 <p class="font-semibold text-gray-800 truncate"><?php echo $branch_name; ?> (B00<?php echo $current_branch_id; ?>)</p>
@@ -295,10 +295,6 @@ try {
                             <div>
                                 <p class="text-gray-500">User Code</p>
                                 <p class="font-semibold text-gray-800"><?php echo htmlspecialchars($_SESSION['user_code'] ?? 'N/A'); ?></p>
-                            </div>
-                            <div>
-                                <p class="text-gray-500">Last Login</p>
-                                <p class="font-semibold text-gray-800"><?php echo $last_login; ?></p>
                             </div>
                         </div>
                     </div>
@@ -309,13 +305,13 @@ try {
                         <!-- LEFT: TIME/DATE & CALENDAR -->
                         <div class="space-y-4">
                             <!-- Time/Date -->
-                            <div class="bg-white p-4 rounded-xl shadow-lg text-right text-lg font-medium">
+                            <div class="bg-[#F4F6FA] p-4 rounded-xl shadow-lg text-right text-lg font-medium">
                                 <p id="current-date" class="text-gray-600 text-sm"></p>
                                 <p class="text-indigo-600 font-extrabold text-4xl mt-1" id="current-time"></p>
                             </div>
 
                             <!-- Calendar Widget -->
-                            <div class="bg-white p-6 rounded-xl shadow-lg">
+                            <div class="bg-[#F4F6FA] p-6 rounded-xl shadow-lg">
                                 <h4 class="text-lg font-bold text-gray-800 mb-4">Quick Calendar View</h4>
                                 <div class="flex justify-between items-center mb-4">
                                     <button id="prev-month" class="text-gray-600 hover:text-indigo-600 transition p-1 rounded-full hover:bg-gray-100"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
@@ -329,18 +325,34 @@ try {
                                     <!-- Calendar days rendered by JS -->
                                 </div>
                             </div>
+
+                            <!-- Calendar Note Modal -->
+                            <div id="calendar-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+                                <div class="bg-white p-6 rounded-lg shadow-lg w-96">
+                                    <h3 id="modal-title" class="text-lg font-bold mb-4">Add/Edit Note</h3>
+                                    <div id="existing-note-display" class="hidden mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                                        <p class="text-sm font-medium text-yellow-800 mb-2">Existing Note:</p>
+                                        <p id="existing-note-text" class="text-sm text-gray-700"></p>
+                                    </div>
+                                    <textarea id="note-text" rows="4" class="w-full border border-gray-300 rounded-lg p-2" placeholder="Enter your note..."></textarea>
+                                    <div class="flex justify-end mt-4 space-x-2">
+                                        <button id="cancel-note" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Cancel</button>
+                                        <button id="save-note" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- RIGHT: PERSONAL NOTES & TODO -->
-                        <div class="bg-gray-50 rounded-xl shadow-lg p-6 flex flex-col">
+                        <div class="bg-[#F4F6FA] rounded-xl shadow-lg p-6 flex flex-col">
                             <h4 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
                                 <i data-lucide="clipboard-list" class="w-6 h-6 mr-2 text-indigo-600"></i>
                                 Personal Notes & To-Do
                             </h4>
 
                             <!-- New Note Input -->
-                            <div class="mb-4 p-4 bg-white rounded-lg border">
-                                <textarea id="note-input" rows="3" class="w-full border-gray-300 rounded-lg p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Write a quick note or to-do item..."></textarea>
+                            <div class="mb-4 p-4 bg-[#F4F6FA] rounded-lg border">
+                                <textarea id="note-input" rows="3" class="w-full border-gray-300 bg-[#F4F6FA] rounded-lg p-2 text-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Write a quick note or to-do item..."></textarea>
                                 <button id="save-note-btn" class="mt-2 w-full px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition">
                                     <i data-lucide="plus" class="w-4 h-4 inline-block mr-2"></i> Add Note
                                 </button>
@@ -355,7 +367,7 @@ try {
                     </div>
                     
                     <!-- BOTTOM SECTION: ACCOUNT FEATURES TABS -->
-                    <div class="bg-white rounded-xl shadow-lg">
+                    <div class="bg-[#F4F6FA] rounded-xl shadow-lg">
                         
                         <!-- Tab Navigation -->
                         <div class="border-b border-gray-200 px-4 sm:px-6">
@@ -363,7 +375,7 @@ try {
                                 <button id="general-tab" onclick="setActiveTab('general')" class="tab-button py-4 px-1 text-sm transition duration-150">General Information</button>
                                 <button id="security-tab" onclick="setActiveTab('security')" class="tab-button py-4 px-1 text-sm transition duration-150">Security & Settings</button>
                                 <button id="details-tab" onclick="setActiveTab('details')" class="tab-button py-4 px-1 text-sm transition duration-150">Personal Details</button>
-                                <button id="activity-tab" onclick="setActiveTab('activity')" class="tab-button py-4 px-1 text-sm transition duration-150">Activity Log</button>
+
                             </nav>
                         </div>
 
@@ -377,7 +389,7 @@ try {
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     
                                     <!-- Account Details Card -->
-                                    <div class="bg-gray-50 p-5 rounded-lg border">
+                                    <div class="bg-[#F4F6FA] p-5 rounded-lg border">
                                         <h5 class="font-semibold text-lg mb-3 text-indigo-700">Contact & Login</h5>
                                         <dl class="space-y-3 text-sm">
                                             <div class="flex justify-between border-b pb-1">
@@ -400,7 +412,7 @@ try {
                                     </div>
 
                                     <!-- HR Details Card -->
-                                    <div class="bg-gray-50 p-5 rounded-lg border">
+                                    <div class="bg-[#F4F6FA] p-5 rounded-lg border">
                                         <h5 class="font-semibold text-lg mb-3 text-indigo-700">HR Snapshot</h5>
                                         <dl class="space-y-3 text-sm">
                                             <div class="flex justify-between border-b pb-1">
@@ -432,7 +444,7 @@ try {
                                 <div class="space-y-6">
                                     
                                     <!-- Change Password -->
-                                    <div class="bg-indigo-50 p-6 rounded-lg border border-indigo-200">
+                                    <div class="bg-[#F4F6FA] p-6 rounded-lg border border-indigo-200">
                                         <h5 class="text-lg font-semibold mb-2">Change Password</h5>
                                         <p class="text-sm text-gray-600 mb-4">Update your account password frequently to ensure security.</p>
                                         <form method="post" class="space-y-3">
@@ -458,7 +470,7 @@ try {
                                     </div>
 
                                     <!-- Two-Factor Authentication -->
-                                    <div class="bg-white p-6 rounded-lg border">
+                                    <div class="bg-[#F4F6FA] p-6 rounded-lg border">
                                         <h5 class="text-lg font-semibold mb-2">Two-Factor Authentication (2FA)</h5>
                                         <div class="flex justify-between items-center">
                                             <p class="text-gray-600">Status: <span class="font-semibold text-green-600">Enabled</span></p>
@@ -467,7 +479,7 @@ try {
                                     </div>
                                     
                                     <!-- Session Management -->
-                                    <div class="bg-white p-6 rounded-lg border">
+                                    <div class="bg-[#F4F6FA] p-6 rounded-lg border">
                                         <h5 class="text-lg font-semibold mb-4">Active Sessions</h5>
                                         <ul class="space-y-3 text-sm text-gray-700">
                                             <li class="flex justify-between items-center border-b pb-2">
@@ -489,7 +501,7 @@ try {
                                 
                                 <div class="space-y-8">
                                     <!-- Editable Details Form -->
-                                    <div class="bg-gray-50 p-6 rounded-lg border">
+                                    <div class="bg-[#F4F6FA] p-6 rounded-lg border">
                                         <h5 class="font-semibold text-lg mb-4 text-indigo-700">Personal Contact Information</h5>
                                         <form method="post" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <input type="hidden" name="action" value="update_details">
@@ -524,7 +536,7 @@ try {
                                     </div>
 
                                     <!-- Emergency Contact -->
-                                    <div class="p-6 rounded-lg border bg-white">
+                                    <div class="p-6 rounded-lg border bg-[#F4F6FA]">
                                         <h5 class="text-lg font-semibold mb-4 text-red-600">Emergency Contact</h5>
                                         <dl class="space-y-3 text-sm">
                                             <div class="flex justify-between border-b pb-1">
@@ -540,58 +552,7 @@ try {
                                 </div>
                             </div>
 
-                            <!-- 4. ACTIVITY LOG CONTENT -->
-                            <div id="activity-content" class="tab-content hidden">
-                                <h4 class="text-xl font-bold text-gray-800 mb-6">Recent Activity Timeline</h4>
-
-                                <ol class="relative border-l border-gray-200">                  
-                                    <!-- Activity Item 1 -->
-                                    <li class="mb-8 ml-6">            
-                                        <span class="absolute flex items-center justify-center w-3 h-3 bg-blue-100 rounded-full -left-1.5 ring-8 ring-white">
-                                            <i data-lucide="receipt" class="w-3 h-3 text-blue-600"></i>
-                                        </span>
-                                        <h5 class="flex items-center mb-1 text-lg font-semibold text-gray-900">
-                                            Processed Sale (ID: 521)
-                                        </h5>
-                                        <time class="block mb-2 text-sm font-normal leading-none text-gray-400">
-                                            November 4, 2024 at 11:45 AM
-                                        </time>
-                                        <p class="text-base font-normal text-gray-500">
-                                            Transaction Type: Cash | Total Amount: ₱ 1,450.00
-                                        </p>
-                                    </li>
-                                    <!-- Activity Item 2 -->
-                                    <li class="mb-8 ml-6">
-                                        <span class="absolute flex items-center justify-center w-3 h-3 bg-green-100 rounded-full -left-1.5 ring-8 ring-white">
-                                            <i data-lucide="check-check" class="w-3 h-3 text-green-600"></i>
-                                        </span>
-                                        <h5 class="mb-1 text-lg font-semibold text-gray-900">
-                                            Profile Update
-                                        </h5>
-                                        <time class="block mb-2 text-sm font-normal leading-none text-gray-400">
-                                            October 28, 2024
-                                        </time>
-                                        <p class="text-base font-normal text-gray-500">
-                                            Updated Emergency Contact Phone Number.
-                                        </p>
-                                    </li>
-                                     <!-- Activity Item 3 -->
-                                    <li class="mb-8 ml-6">
-                                        <span class="absolute flex items-center justify-center w-3 h-3 bg-purple-100 rounded-full -left-1.5 ring-8 ring-white">
-                                            <i data-lucide="log-in" class="w-3 h-3 text-purple-600"></i>
-                                        </span>
-                                        <h5 class="mb-1 text-lg font-semibold text-gray-900">
-                                            Successful Login
-                                        </h5>
-                                        <time class="block mb-2 text-sm font-normal leading-none text-gray-400">
-                                            October 20, 2024 at 8:05 AM
-                                        </time>
-                                        <p class="text-base font-normal text-gray-500">
-                                            Login from Lipa Branch workstation.
-                                        </p>
-                                    </li>
-                                </ol>
-                            </div>
+                           
 
                         </div>
 
@@ -623,14 +584,54 @@ try {
                         // --- CALENDAR WIDGET LOGIC ---
                         let currentCalendarDate = new Date();
 
+                        let calendarNotes = {}; // Store notes for the current month
+
+                        function loadCalendarNotes() {
+                            const month = currentCalendarDate.getMonth() + 1;
+                            const year = currentCalendarDate.getFullYear();
+                            const startDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+                            const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+
+                            fetch(`api/calendar_notes.php?start_date=${startDate}&end_date=${endDate}`)
+                                .then(response => response.json())
+                                .then(data => {
+                                    calendarNotes = {};
+                                    data.forEach(note => {
+                                        calendarNotes[note.NoteDate] = note.NoteText;
+                                    });
+                                    renderCalendar();
+                                })
+                                .catch(error => {
+                                    console.error('Error loading notes:', error);
+                                    renderCalendar(); // Render calendar even if API fails
+                                });
+                        }
+
+                        function saveCalendarNote(noteDate, noteText) {
+                            fetch('api/calendar_notes.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ note_date: noteDate, note_text: noteText })
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    loadCalendarNotes(); // Reload notes to ensure the calendar reflects the saved note
+                                } else {
+                                    alert('Error saving note: ' + data.error);
+                                }
+                            })
+                            .catch(error => console.error('Error saving note:', error));
+                        }
+
                         function renderCalendar() {
                             const container = document.getElementById('calendar-days');
                             const monthYearDisplay = document.getElementById('calendar-month-year');
-                            
+
                             if (!container || !monthYearDisplay) return;
 
                             container.innerHTML = '';
-                            
+
                             const month = currentCalendarDate.getMonth();
                             const year = currentCalendarDate.getFullYear();
 
@@ -650,31 +651,96 @@ try {
                             for (let day = 1; day <= daysInMonth; day++) {
                                 const dayEl = document.createElement('div');
                                 dayEl.textContent = day;
-                                dayEl.className = 'p-1 text-sm text-center rounded-lg transition duration-150 cursor-pointer';
+                                dayEl.className = 'p-1 text-sm text-center rounded-lg transition duration-150 cursor-pointer relative';
+
+                                const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+                                const hasNote = calendarNotes[dateStr];
 
                                 if (day === todayDate && month === todayMonth && year === todayYear) {
                                     dayEl.classList.add('bg-indigo-600', 'text-white', 'font-bold', 'shadow-md');
                                 } else {
                                     dayEl.classList.add('hover:bg-indigo-100', 'text-gray-700');
                                 }
-                                
-                                if (month === 4 && day === 15 && year === 2022) { // May 15, 2022
-                                    dayEl.classList.remove('bg-indigo-600', 'text-white', 'font-bold');
-                                    dayEl.classList.add('bg-green-200', 'text-green-800', 'font-semibold', 'border-2', 'border-green-500');
-                                    dayEl.title = 'Hire Date';
+
+                                if (hasNote) {
+                                    // Apply note styling after base styling
+                                    dayEl.classList.remove('bg-indigo-600', 'text-white', 'font-bold', 'hover:bg-indigo-100', 'text-gray-700');
+                                    dayEl.classList.add('bg-yellow-200', 'text-yellow-800', 'font-semibold', 'border-2', 'border-yellow-500');
+                                    dayEl.innerHTML += '<span class="absolute top-0 right-0 w-2 h-2 bg-yellow-500 rounded-full"></span>';
                                 }
+
+                                // Special handling for Hire Date (use a variable from PHP)
+                                // Hire Date logic should be: if today is also the hire date, keep today's styling.
+                                // The variable $hire_date_js is available in PHP, let's use it here.
+                                const hireDateJs = '<?php echo $hire_date_js; ?>';
+                                if (hireDateJs && dateStr === hireDateJs) {
+                                    // Check if it's ALSO the current date. If not, apply special hire date styling.
+                                    if (!(day === todayDate && month === todayMonth && year === todayYear)) {
+                                         dayEl.classList.remove('bg-indigo-600', 'text-white', 'font-bold', 'hover:bg-indigo-100', 'text-gray-700', 'bg-yellow-200', 'text-yellow-800', 'border-2', 'border-yellow-500');
+                                         // Clear note bubble if present
+                                         if(dayEl.querySelector('.w-2.h-2')) dayEl.querySelector('.w-2.h-2').remove();
+
+                                         dayEl.classList.add('bg-green-200', 'text-green-800', 'font-semibold', 'border-2', 'border-green-500');
+                                         dayEl.title = 'Hire Date';
+                                    }
+                                }
+
+                                dayEl.addEventListener('click', () => openCalendarModal(dateStr));
                                 container.appendChild(dayEl);
                             }
                         }
 
+                        function openCalendarModal(dateStr) {
+                            const modal = document.getElementById('calendar-modal');
+                            const title = document.getElementById('modal-title');
+                            const textArea = document.getElementById('note-text');
+                            const saveBtn = document.getElementById('save-note');
+                            const cancelBtn = document.getElementById('cancel-note');
+                            const existingNoteDisplay = document.getElementById('existing-note-display');
+                            const existingNoteText = document.getElementById('existing-note-text');
+
+                            title.textContent = `Note for ${new Date(dateStr).toLocaleDateString()}`;
+                            const existingNote = calendarNotes[dateStr];
+                            if (existingNote) {
+                                existingNoteDisplay.classList.remove('hidden');
+                                existingNoteText.textContent = existingNote;
+                                textArea.placeholder = "Add additional note...";
+                            } else {
+                                existingNoteDisplay.classList.add('hidden');
+                                textArea.placeholder = "Enter your note...";
+                            }
+                            textArea.value = '';
+                            modal.classList.remove('hidden');
+
+                            saveBtn.onclick = () => {
+                                const newNoteText = textArea.value.trim();
+                                if (newNoteText || existingNote) { // Allow saving if there's new text or existing text to save
+                                    // Combine existing note with the new text from the textarea
+                                    const fullNoteToSave = existingNote && newNoteText
+                                        ? existingNote + '\n\n' + newNoteText
+                                        : (existingNote || newNoteText); // Use existing or new if only one exists
+
+                                    // If the user cleared the textarea and there was no existing note, we don't save an empty note.
+                                    if (fullNoteToSave) {
+                                        saveCalendarNote(dateStr, fullNoteToSave);
+                                    }
+                                }
+                                modal.classList.add('hidden');
+                            };
+
+                            cancelBtn.onclick = () => {
+                                modal.classList.add('hidden');
+                            };
+                        }
+
                         function changeMonth(delta) {
                             currentCalendarDate.setMonth(currentCalendarDate.getMonth() + delta);
-                            renderCalendar();
+                            loadCalendarNotes();
                         }
 
                         document.getElementById('prev-month')?.addEventListener('click', () => changeMonth(-1));
                         document.getElementById('next-month')?.addEventListener('click', () => changeMonth(1));
-                        renderCalendar();
+                        loadCalendarNotes(); // Initial load
 
                         // --- TAB LOGIC ---
                         window.setActiveTab = function(tabId) {
@@ -690,56 +756,119 @@ try {
                                 activeTabButton.classList.remove('text-gray-500', 'hover:text-indigo-600', 'hover:bg-gray-50');
                                 activeTabButton.classList.add('bg-white', 'text-indigo-600', 'font-semibold', 'border-b-2', 'border-indigo-600');
                             }
+
+                            // Load activity logs when activity tab is activated
+                            if (tabId === 'activity') {
+                                loadActivityLogs();
+                            }
                         }
                         setActiveTab('general'); // Set initial tab
 
-                        // --- FIRESTORE NOTES LOGIC (MOCK) ---
-                        // This is a placeholder. A real implementation would use Firebase SDK.
+
+
+                        // --- TODO LIST LOGIC ---
                         const notesList = document.getElementById('notes-list');
                         const saveNoteBtn = document.getElementById('save-note-btn');
                         const noteInput = document.getElementById('note-input');
 
-                        let mockNotes = [
-                            { id: 'note1', content: 'Follow up on inventory report.' },
-                            { id: 'note2', content: 'Prepare for the weekly staff meeting.' }
-                        ];
+                        let todoItems = [];
 
-                        function renderNotes() {
+                        function loadTodoItems() {
+                            fetch('api/todo.php')
+                                .then(response => response.json())
+                                .then(data => {
+                                    todoItems = data;
+                                    renderTodoItems();
+                                })
+                                .catch(error => {
+                                    console.error('Error loading todo items:', error);
+                                    renderTodoItems(); // Render even if error
+                                });
+                        }
+
+                        function renderTodoItems() {
                             if (!notesList) return;
                             notesList.innerHTML = '';
-                            if (mockNotes.length === 0) {
-                                notesList.innerHTML = '<p class="text-gray-500 text-sm italic p-4">No notes yet. Add one above!</p>';
+                            if (todoItems.length === 0) {
+                                notesList.innerHTML = '<p class="text-gray-500 text-sm italic p-4">No tasks yet. Add one above!</p>';
                                 return;
                             }
-                            mockNotes.forEach(note => {
-                                const noteEl = document.createElement('div');
-                                noteEl.className = 'p-3 bg-white rounded-lg border border-gray-100 flex justify-between items-start transition duration-100 hover:shadow-md';
-                                noteEl.innerHTML = `
-                                    <p class="text-sm text-gray-800 break-words flex-grow mr-4">${note.content}</p>
-                                    <button onclick="deleteNote('${note.id}')" class="flex-shrink-0 text-red-400 hover:text-red-600 transition" title="Delete Note">
+                            todoItems.forEach(item => {
+                                const itemEl = document.createElement('div');
+                                itemEl.className = 'p-3 bg-white rounded-lg border border-gray-100 flex justify-between items-start transition duration-100 hover:shadow-md';
+                                itemEl.innerHTML = `
+                                    <div class="flex items-center flex-grow mr-4">
+                                        <input type="checkbox" ${item.IsDone ? 'checked' : ''} onchange="toggleTodo(${item.TaskID})" class="mr-3">
+                                        <p class="text-sm text-gray-800 break-words ${item.IsDone ? 'line-through text-gray-500' : ''}">${item.TaskText}</p>
+                                    </div>
+                                    <button onclick="deleteTodo(${item.TaskID})" class="flex-shrink-0 text-red-400 hover:text-red-600 transition" title="Delete Task">
                                         <i data-lucide="trash-2" class="w-4 h-4"></i>
                                     </button>
                                 `;
-                                notesList.appendChild(noteEl);
+                                notesList.appendChild(itemEl);
                             });
                             lucide.createIcons();
                         }
 
-                        window.deleteNote = function(noteId) {
-                            mockNotes = mockNotes.filter(n => n.id !== noteId);
-                            renderNotes();
+                        window.deleteTodo = function(taskId) {
+                            fetch('api/todo.php', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ action: 'delete', id: taskId })
+                            })
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.success) {
+                                    loadTodoItems();
+                                } else {
+                                    alert('Error deleting task: ' + data.error);
+                                }
+                            })
+                            .catch(error => console.error('Error deleting task:', error));
+                        }
+
+                        window.toggleTodo = function(taskId) {
+                            const item = todoItems.find(i => i.TaskID === taskId);
+                            if (item) {
+                                fetch('api/todo.php', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'toggle', id: taskId, is_done: !item.IsDone })
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        loadTodoItems();
+                                    } else {
+                                        alert('Error toggling task: ' + data.error);
+                                    }
+                                })
+                                .catch(error => console.error('Error toggling task:', error));
+                            }
                         }
 
                         saveNoteBtn?.addEventListener('click', function() {
                             const content = noteInput.value.trim();
                             if (content) {
-                                mockNotes.push({ id: 'note' + Date.now(), content: content });
-                                noteInput.value = '';
-                                renderNotes();
+                                fetch('api/todo.php', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ action: 'add', text: content })
+                                })
+                                .then(response => response.json())
+                                .then(data => {
+                                    if (data.success) {
+                                        noteInput.value = '';
+                                        loadTodoItems();
+                                    } else {
+                                        alert('Error adding task: ' + data.error);
+                                    }
+                                })
+                                .catch(error => console.error('Error adding task:', error));
                             }
                         });
 
-                        renderNotes(); // Initial render
+                        loadTodoItems(); // Initial load
 
                         // Initialize Lucide icons for the whole page
                         lucide.createIcons();
