@@ -524,21 +524,30 @@ function closeEditModal() {
 }
 
 function deleteMedicine(medicineId) {
-    if (!confirm('Are you sure you want to delete this medicine from inventory? This action cannot be undone.')) {
-        return;
-    }
-
-    apiRequest('delete_medicine', { medicineId: medicineId }, 'POST').then(res => {
-        if (res.success) {
-            loadMedicines();
-            loadAlerts();
-            showNotification('Medicine deleted successfully!', 'success');
-        } else {
-            showNotification('Error: ' + (res.error || 'Failed to delete medicine'), 'error');
+    Swal.fire({
+        title: 'Are you sure?',
+        text: "This action cannot be undone.",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Yes, delete it!',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            apiRequest('delete_medicine', { medicine_id: medicineId }, 'POST').then(res => {
+                if (res.success) {
+                    loadMedicines();
+                    loadAlerts();
+                    showNotification('Medicine deleted successfully!', 'success');
+                } else {
+                    showNotification('Error: ' + (res.error || 'Failed to delete medicine'), 'error');
+                }
+            }).catch(error => {
+                console.error('Error deleting medicine:', error);
+                showNotification('Error deleting medicine. Please try again.', 'error');
+            });
         }
-    }).catch(error => {
-        console.error('Error deleting medicine:', error);
-        showNotification('Error deleting medicine. Please try again.', 'error');
     });
 }
 

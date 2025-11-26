@@ -47,7 +47,6 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
 // NOTE: You'll need to update your b-login.php to also pull FirstName and LastName 
 // and store them in the session for this to work perfectly.
 // For now, it uses 'Staff' and 'User' as fallback names.
-
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -104,7 +103,7 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
         </header>
 
         <!-- 2. SECONDARY NAVIGATION BAR (Light Cream/White) -->
-        <nav class="bg-white border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
+        <nav class="bg-[#F4F6FA] border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
             
             <!-- Navigation Links - INCREASED TEXT SIZE to text-base -->
             <div class="flex space-x-8 text-base font-medium">
