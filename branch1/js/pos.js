@@ -6,6 +6,13 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeTarget = 'qty'; // 'qty' or 'payment'
     let selectedMedicine = null;
 
+    // New state variables for discount and VAT
+    let discountPercent = 0;
+    let vatPercent = 0;
+
+    const discountInput = document.getElementById('discount_input');
+    const vatInput = document.getElementById('vat_input');
+
     const orderBody = document.getElementById('order-body');
     const totalEl = document.getElementById('total');
     const qtyInput = document.getElementById('qty_input');
@@ -109,12 +116,12 @@ document.addEventListener('DOMContentLoaded', () => {
             qtyInput.value = '';
         } else if (value === '✓') {
             // Confirm qty and add medicine to order
-            const qty = parseInt(qtyInput.value);
-            if (isNaN(qty) || qty <= 0) {
+                const qty = parseInt(qtyInput.value);
+                if (isNaN(qty) || qty <= 0) {
                 alert('Please enter a valid quantity.');
                 return;
             }
-            addToOrder(selectedMedicine, qty);
+                addOrUpdateOrderRow(selectedMedicine);
             qtyInput.value = '';
             selectedMedicine = null;
             highlightSelectedMedicine(null);
@@ -134,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const payment = parseFloat(paymentInput.value);
-            const total = calculateTotal();
+            const total = calculateFinalTotal().totalWithVat;
             if (isNaN(payment) || payment < total) {
                 alert('Insufficient payment amount.');
                 return;
@@ -150,63 +157,76 @@ document.addEventListener('DOMContentLoaded', () => {
         updateChange();
     }
 
-    // Add medicine and quantity to order
-    function addToOrder(medicine, qty) {
-        // Check if item already exists in order
-        const existingItemIndex = order.findIndex(item => item.id === medicine.id);
-        if (existingItemIndex >= 0) {
-            // Update qty
-            order[existingItemIndex].qty += qty;
+    // Add or update an order row (keeps DOM and `order` array in sync)
+    function addOrUpdateOrderRow(medicine) {
+        const qty = parseInt(qtyInput.value || 1, 10) || 1;
+
+        // Update or insert in `order` array (set qty to input value)
+        const existingIdx = order.findIndex(i => i.id === medicine.id);
+        if (existingIdx >= 0) {
+            order[existingIdx].qty = qty;
+            order[existingIdx].price = medicine.price;
+            order[existingIdx].name = medicine.name;
         } else {
-            order.push({
-                id: medicine.id,
-                name: medicine.name,
-                price: medicine.price,
-                qty: qty
-            });
+            order.push({ id: medicine.id, name: medicine.name, price: medicine.price, qty: qty });
         }
+
         renderOrder();
-        updateTotalsUI();
+        updateTotals();
+        updateChange();
     }
 
-    // Render the current order in the table
+    // Render the current order in the table (also sets data- attributes)
     function renderOrder() {
         orderBody.innerHTML = '';
-        order.forEach((item, index) => {
+        order.forEach((item) => {
             const subtotal = item.price * item.qty;
             const tr = document.createElement('tr');
+            tr.dataset.id = item.id;
+            tr.dataset.qty = item.qty;
+            tr.dataset.price = item.price;
             tr.innerHTML = `
                 <td class="py-2 px-4 text-center">${item.qty}</td>
                 <td class="py-2 px-4">${item.name}</td>
-                <td class="py-2 px-4 text-right">₱${subtotal.toFixed(2)}</td>
+                <td class="py-2 px-4 text-right row-amt">₱${subtotal.toFixed(2)}</td>
                 <td class="py-2 px-2 text-center">
-                    <button class="text-red-500 hover:text-red-700" aria-label="Remove item" data-index="${index}">&times;</button>
+                    <button class="text-red-500 hover:text-red-700" aria-label="Remove item" onclick="window.removeRow(this)">&times;</button>
                 </td>
             `;
-            // Remove button event
-            tr.querySelector('button').addEventListener('click', e => {
-                const idx = parseInt(e.target.getAttribute('data-index'));
-                removeOrderItem(idx);
-            });
             orderBody.appendChild(tr);
         });
     }
 
-    // Remove item from order
+    // Remove item from order by index (kept for backward compatibility)
     function removeOrderItem(index) {
         if (index >= 0 && index < order.length) {
             order.splice(index, 1);
             renderOrder();
-            updateTotalsUI();
+            updateTotals();
             updateChange();
         }
     }
+
+    // Remove row helper used by inline onclick in rendered rows
+    window.removeRow = function(button) {
+        const tr = button.closest('tr');
+        if (!tr) return;
+        const id = tr.dataset.id;
+        const idx = order.findIndex(i => i.id === id);
+        if (idx >= 0) {
+            order.splice(idx, 1);
+        }
+        tr.remove();
+        renderOrder();
+        updateTotals();
+        updateChange();
+    };
 
     // Clear the order entirely
     clearOrderBtn.addEventListener('click', () => {
         order = [];
         renderOrder();
-        updateTotalsUI();
+        updateTotals();
         qtyInput.value = '';
         paymentInput.value = '';
         changeEl.textContent = '₱0.00';
@@ -216,21 +236,39 @@ document.addEventListener('DOMContentLoaded', () => {
         updateInputHighlight();
     });
 
-    // Update totals displayed in UI
-    function updateTotalsUI() {
-        const total = calculateTotal();
-        totalEl.textContent = `₱${total.toFixed(2)}`;
+    // Calculate raw total (sum of price * qty)
+    function calculateRawTotal() {
+        return order.reduce((acc, item) => acc + (parseFloat(item.price) || 0) * (parseFloat(item.qty) || 0), 0);
     }
 
-    // Calculate total of the order
-    function calculateTotal() {
-        return order.reduce((acc, item) => acc + item.price * item.qty, 0);
+    // Calculate final total after discount and VAT
+    function calculateFinalTotal() {
+        const raw = calculateRawTotal();
+        const discountType = document.getElementById('discount_type') ? document.getElementById('discount_type').value : 'regular';
+        const vatPercent = parseFloat(document.getElementById('vat_percent') ? document.getElementById('vat_percent').value : 0) || 0;
+        const discount = raw * (discountRates[discountType] || 0);
+        const taxable = raw - discount;
+        const vat_amount = taxable * (vatPercent / 100);
+        const totalWithVat = taxable + vat_amount;
+        return { raw, discount, vat_amount, totalWithVat, discountType };
+    }
+
+    // Update totals displayed in UI and discount input
+    function updateTotals() {
+        const totals = calculateFinalTotal();
+        const discountInputEl = document.getElementById('discount_amount');
+        if (discountInputEl) discountInputEl.value = totals.discount.toFixed(2);
+
+        if (totalEl) {
+            totalEl.textContent = `₱${totals.totalWithVat.toFixed(2)}`;
+            totalEl.dataset.rawTotal = totals.raw.toFixed(2);
+        }
     }
 
     // Update change display based on payment input
     function updateChange() {
         const payment = parseFloat(paymentInput.value) || 0;
-        const total = calculateTotal();
+        const total = calculateFinalTotal().totalWithVat;
         const change = payment - total;
         if (change < 0) {
             changeEl.textContent = '₱0.00';
@@ -250,7 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('Please enter a valid quantity.');
             return;
         }
-        addToOrder(selectedMedicine, qty);
+        addOrUpdateOrderRow(selectedMedicine);
         qtyInput.value = '';
         selectedMedicine = null;
         highlightSelectedMedicine(null);
@@ -274,13 +312,14 @@ document.addEventListener('DOMContentLoaded', () => {
         checkoutButton.disabled = true;
         checkoutButton.textContent = 'Processing...';
 
-        const total = calculateTotal();
+            const total = calculateFinalTotal().totalWithVat;
         const paymentTypeSelect = document.getElementById('payment_type');
         let paymentMethod = 'Cash';
         if (paymentTypeSelect && paymentTypeSelect.value) {
             paymentMethod = paymentTypeSelect.value;
         }
 
+        const totals = calculateFinalTotal();
         const payload = {
             items: order.map(item => ({
                 id: parseInt(item.id),
@@ -288,7 +327,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 qty: item.qty,
                 price: item.price
             })),
-            total_amount: total,
+            total_amount: totals.totalWithVat,
+            raw_total: totals.raw,
+            discount_amount: totals.discount,
+            vat_amount: totals.vat_amount,
+            discount_type: totals.discountType || (document.getElementById('discount_type') ? document.getElementById('discount_type').value : 'regular'),
             payment_method: paymentMethod, // Use selected payment method or default to Cash
             customer_name: null // Could extend UI for customer name if needed
         };
@@ -296,6 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('api/pos_api.php', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json'
                 },
@@ -321,7 +365,7 @@ if (response.ok && data.success) {
         // Reset order UI
         order = [];
         renderOrder();
-        updateTotalsUI();
+        updateTotals();
         qtyInput.value = '';
         paymentInput.value = '';
         const paymentTypeSelect = document.getElementById('payment_type');
@@ -332,9 +376,9 @@ if (response.ok && data.success) {
 
         // Set values in hidden inputs
         orderDataInput.value = JSON.stringify(payload.items);
-        totalAmountInput.value = total.toFixed(2);
+        totalAmountInput.value = payload.total_amount.toFixed(2);
         paymentAmountInput.value = paymentAmount.toFixed(2);
-        changeAmountInput.value = (paymentAmount - total).toFixed(2);
+        changeAmountInput.value = (paymentAmount - payload.total_amount).toFixed(2);
 
         // Show the invoice modal instead of submitting form
         window.showInvoiceModal({
@@ -342,9 +386,13 @@ if (response.ok && data.success) {
             cashier: window.currentUserFull || 'N/A',
             branch: window.currentBranchName || 'N/A',
             items: payload.items,
-            total_amount: total,
+            total_amount: payload.total_amount,
+            raw_total: payload.raw_total,
+            discount_amount: payload.discount_amount,
+            vat_amount: payload.vat_amount,
+            discount_type: payload.discount_type,
             payment_amount: paymentAmount,
-            change_amount: paymentAmount - total,
+            change_amount: paymentAmount - payload.total_amount,
             payment_method: paymentMethod
         });
 
@@ -370,7 +418,7 @@ if (response.ok && data.success) {
             alert('No items in the order.');
             return;
         }
-        if (isNaN(payment) || payment < calculateTotal()) {
+        if (isNaN(payment) || payment < calculateFinalTotal().totalWithVat) {
             alert('Insufficient payment amount.');
             return;
         }
@@ -402,5 +450,31 @@ if (response.ok && data.success) {
 
     // Initialize UI state
     updateInputHighlight();
-    updateTotalsUI();
+    updateTotals();
+
+    // Live qty input: when qty changes and qty is active, update the selected medicine row
+    qtyInput.addEventListener('input', () => {
+        if (activeTarget === 'qty' && selectedMedicine) {
+            addOrUpdateOrderRow(selectedMedicine);
+        }
+    });
+
+    // Wire discount and VAT input changes to recalc totals
+    const discEl = document.getElementById('discount_type');
+    if (discEl) discEl.addEventListener('change', updateTotals);
+    const vatEl = document.getElementById('vat_percent');
+    if (vatEl) vatEl.addEventListener('input', updateTotals);
 });
+
+// Discount rates for different customer types
+const discountRates = {
+    regular: 0,
+    senior: 0.20, // 20%
+    pwd: 0.15     // 15%
+};
+
+// Called whenever quantity, discount type, or VAT changes
+// NOTE: main updateTotals implementation lives inside the DOMContentLoaded scope
+
+// Listeners wired inside DOMContentLoaded
+

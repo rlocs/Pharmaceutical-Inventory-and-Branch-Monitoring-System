@@ -258,11 +258,32 @@ try {
             <input type="number" id="qty_input" value="" placeholder="1"
                    class="w-full bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300"
                    onclick="activeTarget='qty'; updateInputHighlight();">
-<button id="confirm_qty" aria-label="Confirm quantity" title="Confirm" class="bg-green-500 hover:bg-green-600 text-white rounded-xl px-4 shadow-md active:scale-95 transition flex items-center justify-center gap-2 font-semibold text-white text-sm">
-    <i data-lucide="check" class="w-6 h-6"></i>
-</button>
+                <button id="confirm_qty" aria-label="Confirm quantity" title="Confirm" class="bg-green-500 hover:bg-green-600 text-white rounded-xl px-4 shadow-md active:scale-95 transition flex items-center justify-center gap-2 font-semibold text-white text-sm">
+                    <i data-lucide="check" class="w-6 h-6"></i>
+                </button>
             </div>
         </div>
+        <div class="mb-4">
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Discount & VAT</label>
+            <div class="flex gap-2 items-center">
+                <!-- Discount type dropdown -->
+                <select id="discount_type" class="w-1/2 bg-[#F4F6FA] border border-gray-200 text-gray-800 text-sm font-semibold rounded-xl px-3 py-3 focus:outline-none">
+                    <option value="regular" selected>Regular</option>
+                    <option value="senior">Senior</option>
+                    <option value="pwd">PWD</option>
+                </select>
+
+                <!-- Discount amount (auto-calculated) -->
+                <input type="number" id="discount_amount" placeholder="0.00"
+                    class="w-1/2 bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300"
+                    readonly>
+
+                <!-- VAT percentage -->
+                <input type="number" id="vat_percent" placeholder="VAT %" value="12"
+                    class="w-1/4 bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300">
+            </div>
+        </div>
+
 
         <div class="mb-4">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Payment Amount</label>
