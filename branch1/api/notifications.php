@@ -95,8 +95,16 @@ try {
             break;
 
         case 'mark_all_read':
-            $stmt = $pdo->prepare("UPDATE Notifications SET IsRead = 1 WHERE BranchID = ? AND (UserID IS NULL OR UserID = ?)");
-            $stmt->execute([$branchId, $userId]);
+            $type = $_GET['type'] ?? $_POST['type'] ?? 'all';
+            $where = "BranchID = ? AND (UserID IS NULL OR UserID = ?)";
+            $params = [$branchId, $userId];
+            if ($type === 'alerts') {
+                $where .= " AND Type IN ('inventory','med','pos','reports','account')";
+            } elseif ($type === 'chat') {
+                $where .= " AND Type = 'chat'";
+            }
+            $stmt = $pdo->prepare("UPDATE Notifications SET IsRead = 1 WHERE $where");
+            $stmt->execute($params);
             json_response(['success'=>true]);
             break;
 
