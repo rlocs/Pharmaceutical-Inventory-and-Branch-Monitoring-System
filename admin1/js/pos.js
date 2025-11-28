@@ -41,23 +41,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-// Select medicine (clicked on medicine card)
-window.selectMedicine = function(element) {
-    const id = element.getAttribute('data-id');
-    const name = element.getAttribute('data-name');
-    const price = parseFloat(element.getAttribute('data-price'));
+    // Select medicine (clicked on medicine card)
+    window.selectMedicine = function(element) {
+        const id = element.getAttribute('data-id');
+        const name = element.getAttribute('data-name');
+        const price = parseFloat(element.getAttribute('data-price'));
 
-    selectedMedicine = { id, name, price };
+        selectedMedicine = { id, name, price };
 
-    // Clear qty input and focus when new medicine selected
-    qtyInput.value = '';
-    qtyInput.focus();
-    activeTarget = 'qty';
-    updateInputHighlight();
+        // Set qty input to 1 by default when new medicine selected
+        qtyInput.value = 1;
+        activeTarget = 'qty';
+        updateInputHighlight();
 
-    // Highlight selected medicine visually
-    highlightSelectedMedicine(id);
-};
+        // Highlight selected medicine visually (optional)
+        highlightSelectedMedicine(id);
+    };
 
     // Highlight selected medicine visually in the med list
     function highlightSelectedMedicine(selectedId) {
@@ -71,25 +70,21 @@ window.selectMedicine = function(element) {
         });
     }
 
-// Increment qty by 1 for selected medicine
-window.incrementQty = function(button) {
-    button.stopPropagation();
-    const medElem = button.closest('.med');
-    if (!medElem) return;
-    const id = medElem.getAttribute('data-id');
-    
-    if (selectedMedicine && selectedMedicine.id === id) {
-        // If already selected, increment from current value (treat empty as 0)
-        let currentQty = parseInt(qtyInput.value) || 0;
-        qtyInput.value = currentQty + 1;
-    } else {
-        // If selecting new medicine, select it and set quantity to 1
-        selectMedicine(medElem);
-        qtyInput.value = '1';
-    }
-    activeTarget = 'qty';
-    updateInputHighlight();
-};
+    // Increment qty by 1 for selected medicine
+    window.incrementQty = function(button) {
+        button.stopPropagation;
+        const medElem = button.closest('.med');
+        if (!medElem) return;
+        const id = medElem.getAttribute('data-id');
+        if (selectedMedicine && selectedMedicine.id === id) {
+            let currentQty = parseInt(qtyInput.value) || 0;
+            qtyInput.value = currentQty + 1;
+        } else {
+            selectMedicine(medElem);
+        }
+        activeTarget = 'qty';
+        updateInputHighlight();
+    };
 
     // Update input highlights based on active target
     window.updateInputHighlight = function() {
@@ -111,29 +106,28 @@ window.incrementQty = function(button) {
         }
     };
 
-function handleQtyInput(value) {
-    if (!selectedMedicine) {
-        alert('Please select a medicine first.');
-        return;
-    }
-    if (value === 'X') {
-        qtyInput.value = '';
-    } else if (value === '✓') {
-        // Confirm qty and add medicine to order
-        const qty = parseInt(qtyInput.value);
-        if (isNaN(qty) || qty <= 0) {
-            alert('Please enter a valid quantity.');
+    function handleQtyInput(value) {
+        if (!selectedMedicine) {
+            alert('Please select a medicine first.');
             return;
         }
-        addOrUpdateOrderRow(selectedMedicine);
-        qtyInput.value = '';
-        selectedMedicine = null;
-        highlightSelectedMedicine(null);
-    } else {
-        // Append to current value
-        qtyInput.value += value;
+        if (value === 'X') {
+            qtyInput.value = '';
+        } else if (value === '✓') {
+            // Confirm qty and add medicine to order
+                const qty = parseInt(qtyInput.value);
+                if (isNaN(qty) || qty <= 0) {
+                alert('Please enter a valid quantity.');
+                return;
+            }
+                addOrUpdateOrderRow(selectedMedicine);
+            qtyInput.value = '';
+            selectedMedicine = null;
+            highlightSelectedMedicine(null);
+        } else {
+            qtyInput.value += value;
+        }
     }
-}
 
     function handlePaymentInput(value) {
         if (value === 'X') {
@@ -443,11 +437,11 @@ if (response.ok && data.success) {
     updateTotals();
 
     // Live qty input: when qty changes and qty is active, update the selected medicine row
-    /*qtyInput.addEventListener('input', () => {
+    qtyInput.addEventListener('input', () => {
         if (activeTarget === 'qty' && selectedMedicine) {
             addOrUpdateOrderRow(selectedMedicine);
         }
-    });*/
+    });
 
     // Wire discount and VAT input changes to recalc totals
     const discEl = document.getElementById('discount_type');

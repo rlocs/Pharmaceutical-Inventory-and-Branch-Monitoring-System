@@ -116,7 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // ROUTING LOGIC based on ROLE and BRANCHID
                     switch ($user['Role']) {
                         case 'Admin':
-                            header("Location: admin/index.php");
+                            header("Location: admin1/admin1b1.php");
                             exit;
 
                         case 'Staff':
