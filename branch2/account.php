@@ -17,9 +17,9 @@ if ($_SESSION["user_role"] !== 'Staff' && $_SESSION["user_role"] !== 'Admin') {
     die("ERROR: You do not have permission to view this page.");
 }
 
-// 3. Check Branch (Crucial for Staff access). This file is for Branch 1.
-// Admins are not restricted by BranchID, but Staff MUST be from Branch 1.
-$required_branch_id = 2;
+// 3. Check Branch (Crucial for Staff access).
+// Admins are not restricted by BranchID, but Staff MUST be from the required branch.
+$required_branch_id =2;
 if ($required_branch_id > 0 && $_SESSION["user_role"] === 'Staff' && $_SESSION["branch_id"] != $required_branch_id) {
     // Redirect staff who ended up on the wrong branch page
     // Optional: Log this security violation attempt
@@ -468,32 +468,6 @@ try {
                                             </div>
                                         </form>
                                     </div>
-
-                                    <!-- Two-Factor Authentication -->
-                                    <div class="bg-[#F4F6FA] p-6 rounded-lg border">
-                                        <h5 class="text-lg font-semibold mb-2">Two-Factor Authentication (2FA)</h5>
-                                        <div class="flex justify-between items-center">
-                                            <p class="text-gray-600">Status: <span class="font-semibold text-green-600">Enabled</span></p>
-                                            <button class="text-red-600 hover:text-red-700 text-sm font-medium">Disable</button>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Session Management -->
-                                    <div class="bg-[#F4F6FA] p-6 rounded-lg border">
-                                        <h5 class="text-lg font-semibold mb-4">Active Sessions</h5>
-                                        <ul class="space-y-3 text-sm text-gray-700">
-                                            <li class="flex justify-between items-center border-b pb-2">
-                                                <span>Current Device (Chrome on Windows)</span>
-                                                <span class="text-xs text-indigo-600 font-semibold">This Session</span>
-                                            </li>
-                                            <li class="flex justify-between items-center">
-                                                <span>Safari on iOS (Last Active: 2 hours ago)</span>
-                                                <button class="text-red-500 hover:text-red-600 text-xs font-medium">Log Out</button>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
 
                             <!-- 3. PERSONAL DETAILS CONTENT -->
                             <div id="details-content" class="tab-content hidden">

@@ -18,9 +18,9 @@ if ($_SESSION["user_role"] !== 'Staff' && $_SESSION["user_role"] !== 'Admin') {
     die("ERROR: You do not have permission to view this page.");
 }
 
-// 3. Check Branch (Crucial for Staff access). This file is for Branch 1.
-// Admins are not restricted by BranchID, but Staff MUST be from Branch 1.
-$required_branch_id = 2;
+// 3. Check Branch (Crucial for Staff access).
+// Admins are not restricted by BranchID, but Staff MUST be from the required branch.
+$required_branch_id =2;
 if ($required_branch_id > 0 && $_SESSION["user_role"] === 'Staff' && $_SESSION["branch_id"] != $required_branch_id) {
     // Redirect staff who ended up on the wrong branch page
     header("Location: ../login.php?error=branch_mismatch"); 
@@ -254,15 +254,30 @@ try {
         
         <div class="mb-4">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Quantity</label>
-            <div class="flex gap-2">
-            <input type="number" id="qty_input" value="" placeholder="1"
-                   class="w-full bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300"
-                   onclick="activeTarget='qty'; updateInputHighlight();">
-<button id="confirm_qty" aria-label="Confirm quantity" title="Confirm" class="bg-green-500 hover:bg-green-600 text-white rounded-xl px-4 shadow-md active:scale-95 transition flex items-center justify-center gap-2 font-semibold text-white text-sm">
-    <i data-lucide="check" class="w-6 h-6"></i>
-</button>
+<input type="number" id="qty_input" value="" placeholder="Enter quantity"
+       class="w-full bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300"
+       onclick="activeTarget='qty'; updateInputHighlight();">
+        </div>
+        <div class="mb-4">
+            <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Discount & VAT</label>
+            <div class="flex gap-2 items-center">
+                <!-- Discount type dropdown -->
+                <select id="discount_type" class="w-1/2 bg-[#F4F6FA] border border-gray-200 text-gray-800 text-sm font-semibold rounded-xl px-3 py-3 focus:outline-none">
+                    <option value="regular" selected>Regular</option>
+                    <option value="senior">Senior</option>
+                    <option value="pwd">PWD</option>
+                </select>
+
+                <!-- Discount amount (auto-calculated) -->
+                <input type="number" id="discount_amount" placeholder="0.00"
+                    class="w-1/2 bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300">
+
+                <!-- VAT percentage -->
+                <input type="number" id="vat_percent" placeholder="VAT %" value="12"
+                    class="w-1/4 bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300">
             </div>
         </div>
+
 
         <div class="mb-4">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Payment Amount</label>

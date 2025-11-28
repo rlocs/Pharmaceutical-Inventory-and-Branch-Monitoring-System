@@ -81,4 +81,10 @@
   .badge-pos { background-color: #dbf4ff; color: #0369a1; }
   .badge-reports { background-color: #fef3c7; color: #92400e; }
   .badge-account { background-color: #ecfccb; color: #4d7c0f; }
+
+  /* Active tab indicator */
+  .notification-tab.active {
+    border-bottom: 2px solid #4f46e5; /* indigo-600 */
+    color: #4f46e5;
+  }
 </style>

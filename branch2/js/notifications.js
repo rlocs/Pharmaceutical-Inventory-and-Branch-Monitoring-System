@@ -58,7 +58,7 @@
         });
 
         // Close on outside click
-        document.addEventListener('click', function(e) {
+        document.addEventListener('DOMContentLoaded', function() {
             if (notificationDropdown && 
                 !notificationDropdown.contains(e.target) && 
                 !bellButton.contains(e.target)) {
@@ -69,9 +69,17 @@
         // Load notifications
         loadNotifications();
         
-        // Poll for new notifications every 30 seconds
-        notificationState.pollInterval = setInterval(loadNotifications, 30000);
-    });
+    // Poll for new notifications every 30 seconds
+    notificationState.pollInterval = setInterval(loadNotifications, 30000);
+    
+    // Poll specifically for new chat messages every 15 seconds
+    notificationState.chatPollInterval = setInterval(checkForNewChatMessages, 15000);
+    
+    // Request notification permission on page load
+    if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+});
 
     function toggleNotificationDropdown() {
         if (!notificationDropdown) return;
@@ -422,5 +430,109 @@
 
     // Expose functions globally
     window.loadNotifications = loadNotifications;
+
+    // Add this function to notifications.js to check for new chat messages specifically
+function checkForNewChatMessages() {
+    fetch('api/chat_api.php?action=get_conversations', {
+        credentials: 'same-origin'
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success && data.conversations) {
+            let totalUnreadChats = 0;
+            let newMessages = [];
+            
+            data.conversations.forEach(conv => {
+                if (conv.UnreadCount > 0) {
+                    totalUnreadChats += conv.UnreadCount;
+                    
+                    // Check if this is a new message that we haven't notified about yet
+                    const messageKey = `chat_${conv.ConversationID}_${conv.LastMessageTimestamp}`;
+                    const alreadyNotified = localStorage.getItem(messageKey);
+                    
+                    if (!alreadyNotified && conv.UnreadCount > 0) {
+                        newMessages.push({
+                            conversationId: conv.ConversationID,
+                            from: `${conv.FirstName} ${conv.LastName}`,
+                            message: conv.LastMessage,
+                            timestamp: conv.LastMessageTimestamp
+                        });
+                        
+                        // Mark as notified
+                        localStorage.setItem(messageKey, 'true');
+                    }
+                }
+            });
+            
+            // Show push notification for new messages
+            if (newMessages.length > 0) {
+                showChatPushNotification(newMessages);
+            }
+            
+            // Update chat count
+            notificationState.chatCount = totalUnreadChats;
+            updateBadge();
+        }
+    })
+    .catch(error => {
+        console.error('Error checking for new chat messages:', error);
+    });
+}
+
+// Add this function to show push notifications for new chat messages
+function showChatPushNotification(messages) {
+    if (!('Notification' in window)) {
+        console.warn('This browser does not support desktop notifications');
+        return;
+    }
+
+    if (Notification.permission === 'granted') {
+        if (messages.length === 1) {
+            const message = messages[0];
+            const notification = new Notification(`New message from ${message.from}`, {
+                body: message.message || 'You have a new message',
+                icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDE1YTIgMiAwIDAgMS0yIDJIN2wtNCA0VjVhMiAyIDAgMCAxIDItMmgxNGEyIDIgMCAwIDEgMiAydjEwWiIgZmlsbD0iIzRmNDZlNSIvPgo8L3N2Zz4K',
+                tag: 'chat-message',
+                requireInteraction: true
+            });
+
+            notification.onclick = function() {
+                window.focus();
+                // Open chat interface
+                if (typeof toggleSidebar === 'function') {
+                    toggleSidebar();
+                }
+                notification.close();
+            };
+        } else {
+            const notification = new Notification(`You have ${messages.length} new messages`, {
+                body: `From ${messages.map(m => m.from).join(', ')}`,
+                icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTIxIDE1YTIgMiAwIDAgMS0yIDJIN3wtNCA0VjVhMiAyIDAgMCAxIDItMmgxNGEyIDIgMCAwIDEgMiAydjEwWiIgZmlsbD0iIzRmNDZlNSIvPgo8L3N2Zz4K',
+                tag: 'chat-messages',
+                requireInteraction: true
+            });
+
+            notification.onclick = function() {
+                window.focus();
+                // Open notification dropdown on chat tab
+                openNotificationDropdown();
+                switchTab('chat');
+                notification.close();
+            };
+        }
+
+        // Auto-close after 7 seconds
+        setTimeout(() => {
+            notification.close();
+        }, 7000);
+        
+    } else if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(function(permission) {
+            if (permission === 'granted') {
+                showChatPushNotification(messages);
+            }
+        });
+    }
+}
 })();
 

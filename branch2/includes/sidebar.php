@@ -5,7 +5,7 @@
 ?>
 
 <!-- 4. SIDEBAR (Off-screen by default) -->
-<aside id="sidebar" class="sidebar bg-secondary-dark text-white p-6 lg:p-8  flex flex-col shadow-2xl overflow-y-auto">
+<aside id="sidebar" class="sidebar bg-slate-800 text-white p-6 lg:p-8  flex flex-col shadow-2xl overflow-y-auto">
 
     <!-- Sidebar Header / Close Button (Static) -->
     <div class="flex justify-end mb-6 pt-1">

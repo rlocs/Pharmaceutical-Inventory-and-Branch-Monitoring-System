@@ -12,7 +12,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     $_SESSION["loggedin"] = true;
     $_SESSION["user_role"] = "Staff";
     $_SESSION["branch_id"] = 2;
-    $_SESSION["user_id"] = 1;
+    $_SESSION["user_id"] =2;
 }
 
 // 2. Check Role: Only Staff or Admin can access this API.
@@ -22,8 +22,8 @@ if ($_SESSION["user_role"] !== 'Staff' && $_SESSION["user_role"] !== 'Admin') {
     exit;
 }
 
-// 3. Check Branch (Crucial for Staff access). This API is for Branch 2.
-// Admins are not restricted by BranchID, but Staff MUST be from Branch 2.
+// 3. Check Branch (Crucial for Staff access). This API is for Branch 1.
+// Admins are not restricted by BranchID, but Staff MUST be from Branch 1.
 $required_branch_id = 2;
 if ($required_branch_id > 0 && $_SESSION["user_role"] === 'Staff' && $_SESSION["branch_id"] != $required_branch_id) {
     http_response_code(403);
