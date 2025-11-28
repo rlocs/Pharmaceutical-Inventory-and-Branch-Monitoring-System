@@ -1,42 +1,26 @@
 <?php
-// Start the session on every page
 session_start();
 require_once '../dbconnection.php';
-// ------------------------------------------------------------------
-// ACCESS CONTROL CHECK
-// ------------------------------------------------------------------
 
-// 1. Check if the user is not logged in
 if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
     header("Location: ../login.php");
     exit;
 }
 
-// 2. Check Role: Only Staff or Admin can view this page.
 if ($_SESSION["user_role"] !== 'Staff' && $_SESSION["user_role"] !== 'Admin') {
     die("ERROR: You do not have permission to view this page.");
 }
 
-// 3. Check Branch (Crucial for Staff access). This file is for Branch 1.
-// Admins are not restricted by BranchID, but Staff MUST be from Branch 1.
 $required_branch_id = 2;
 if ($required_branch_id > 0 && $_SESSION["user_role"] === 'Staff' && $_SESSION["branch_id"] != $required_branch_id) {
-    // Redirect staff who ended up on the wrong branch page
-    // Optional: Log this security violation attempt
-    header("Location: ../login.php?error=branch_mismatch"); 
+    header("Location: ../login.php?error=branch_mismatch");
     exit;
 }
 
-// ------------------------------------------------------------------
-// DYNAMIC DATA PREPARATION
-// ------------------------------------------------------------------
-
-// Set dynamic variables from session data
 $user_full_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff') . ' ' . htmlspecialchars($_SESSION['last_name'] ?? 'User');
 $user_role = htmlspecialchars($_SESSION['user_role'] ?? 'Staff');
 $current_branch_id = $_SESSION['branch_id'];
 
-// Mock Branch Name lookup (Replace with actual database query if needed)
 $branch_names = [
     1 => 'Lipa, Batangas',
     2 => 'Sto Tomas, Batangas',
@@ -44,28 +28,21 @@ $branch_names = [
 ];
 $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}";
 
-// ------------------------------------------------------------------
-// DATABASE CONNECTION AND DATA FETCHING
-// ------------------------------------------------------------------
-
 
 
 try {
     $db = new Database();
     $pdo = $db->getConnection();
 
-    // Fetch categories from Categories table
     $categories_sql = "SELECT CategoryID, CategoryName FROM Categories ORDER BY CategoryName";
     $categories_stmt = $pdo->prepare($categories_sql);
     $categories_stmt->execute();
     $categories = $categories_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Fetch medicines for the current branch with pagination
-    $page = 1; // Default to first page
-    $limit = 10; // Items per page
+    $page = 1;
+    $limit = 10;
     $offset = ($page - 1) * $limit;
 
-    // Get total count
     $count_sql = "SELECT COUNT(*) as total FROM BranchInventory bi
                   JOIN medicines m ON bi.MedicineID = m.MedicineID
                   WHERE bi.BranchID = ?";
@@ -73,7 +50,6 @@ try {
     $stmt->execute([$current_branch_id]);
     $total = $stmt->fetch()['total'];
 
-    // Get medicines with category name
     $sql = "SELECT bi.BranchInventoryID, m.MedicineName, c.CategoryName AS Category, m.Form, m.Unit,
                    bi.Stocks, bi.Price, bi.ExpiryDate
             FROM BranchInventory bi
@@ -87,13 +63,11 @@ try {
     $medicines = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 } catch (Exception $e) {
-    // Handle database errors gracefully
     $medicines = [];
     $total = 0;
     error_log("Database error in med_inventory.php: " . $e->getMessage());
 }
 
-// Helper functions for status and classes
 function getStatus($stocks, $expiryDate) {
     $today = new DateTime();
     $expiry = new DateTime($expiryDate);
@@ -216,7 +190,6 @@ function escapeHtml($text) {
             </a>
         </nav>
 
-        <!-- 3. MAIN CONTENT AREA (Cream Background) -->
         <main class="bg-custom-bg-white p-6 flex-grow h-full relative z-10">
             <div id="dynamic-content" class="main-content flex-1 p-6 lg:p-10 overflow-y-auto bg-main-bg-color">
                 <h2 id="page-title" class="text-4xl font-extrabold text-gray-900 mb-4">
@@ -224,7 +197,6 @@ function escapeHtml($text) {
                 </h2>
                 <p class="text-gray-600 text-lg mb-8"></p>
 
-                <!-- Alert Banners -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                     <!-- Near Expiry Alert -->
                     <div id="expirySoonAlert" class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-lg shadow-md">
@@ -388,7 +360,6 @@ function escapeHtml($text) {
                         </table>
                     </div>
 
-                    <!-- Pagination -->
                     <div class="flex justify-between items-center mt-8">
                         <span class="text-sm text-gray-600 showing-entries">
                             <?php
@@ -409,8 +380,7 @@ function escapeHtml($text) {
 
 </main>
 
-<!-- Modals -->
-    <!-- Add Medicine Modal -->
+    <div id="addMedicineModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style="display: none;">
     <div id="addMedicineModal" class="modal-overlay fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50" style="display: none;">
         <div class="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div class="p-6">
