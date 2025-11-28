@@ -1,4 +1,4 @@
-         // State management (initialized globally)
+﻿         // State management (initialized globally)
         let isChatMaximized = false;
         let isChatCollapsed = false;
 

@@ -1,11 +1,11 @@
 <?php
 class Database {
     // This IP MUST be the address of the computer running the MySQL database.
-    private $host = '100.71.125.101';
+    private $host = 'localhost';
 
     private $db_name = 'pharmaceutical_db';
-    private $username = 'pharma_user'; // The new user you created for network access
-    private $password = '2003'; // The new password you created (removed typo 'a$')
+    private $username = 'root'; // The new user you created for network access
+    private $password = ''; // The new password you created (removed typo 'a$')
     private $conn;
 
     public function __construct() {
