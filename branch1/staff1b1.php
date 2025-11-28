@@ -29,14 +29,14 @@ if ($required_branch_id > 0 && $_SESSION["user_role"] === 'Staff' && $_SESSION["
 }
 
 // ------------------------------------------------------------------
-// DYNAMIC DATA PREPARATION
+// DYNAMIC DATA PREPARATION USING STORED PROCEDURES
 // ------------------------------------------------------------------
 
 // Set dynamic variables from session data
 $user_full_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff') . ' ' . htmlspecialchars($_SESSION['last_name'] ?? 'User');
 $user_role = htmlspecialchars($_SESSION['user_role'] ?? 'Staff');
-$current_branch_id = $_SESSION['branch_id'];
-$user_id = $_SESSION['user_id'];
+$current_branch_id = $_SESSION["branch_id"];
+$user_id = $_SESSION["user_id"];
 
 // Mock Branch Name lookup (Replace with actual database query if needed)
 $branch_names = [
@@ -46,40 +46,39 @@ $branch_names = [
 ];
 $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}";
 
-// ========== DASHBOARD KPI DATA ==========
+// ========== DASHBOARD KPI DATA USING STORED PROCEDURES ==========
 $db = new Database();
 $conn = $db->getConnection();
 
+// Function to execute stored procedure and handle multiple result sets
+function executeStoredProcedure($conn, $procedureName, $params = []) {
+    // Build the placeholders based on number of parameters
+    $placeholders = str_repeat('?,', count($params) - 1) . '?';
+    $stmt = $conn->prepare("CALL $procedureName($placeholders)");
+    $stmt->execute($params);
+    return $stmt;
+}
+
+// Function to get single result from stored procedure
+function getSingleResult($conn, $procedureName, $params = []) {
+    $stmt = executeStoredProcedure($conn, $procedureName, $params);
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+    $stmt->closeCursor();
+    return $result;
+}
+
 // 1. Today's Sales
-$today_sales_stmt = $conn->prepare("
-    SELECT SUM(TotalAmount) as total_sales, COUNT(*) as transaction_count 
-    FROM SalesTransactions 
-    WHERE BranchID = ? AND DATE(TransactionDateTime) = CURDATE()
-");
-$today_sales_stmt->execute([$current_branch_id]);
-$today_sales = $today_sales_stmt->fetch(PDO::FETCH_ASSOC);
-$today_sales_total = $today_sales['total_sales'] ?? 0;
-$today_transactions = $today_sales['transaction_count'] ?? 0;
+$today_sales = getSingleResult($conn, 'SP_GetDashboardKPIs', [$current_branch_id]);
+$today_sales_total = $today_sales['today_sales_total'] ?? 0;
+$today_transactions = $today_sales['today_transactions'] ?? 0;
 
 // 2. This Week's Sales
-$week_sales_stmt = $conn->prepare("
-    SELECT SUM(TotalAmount) as total_sales
-    FROM SalesTransactions
-    WHERE BranchID = ? AND WEEK(TransactionDateTime) = WEEK(CURDATE()) AND YEAR(TransactionDateTime) = YEAR(CURDATE())
-");
-$week_sales_stmt->execute([$current_branch_id]);
-$week_sales = $week_sales_stmt->fetch(PDO::FETCH_ASSOC);
-$week_sales_total = $week_sales['total_sales'] ?? 0;
+$week_sales = getSingleResult($conn, 'SP_GetWeeklySales', [$current_branch_id]);
+$week_sales_total = $week_sales['week_sales_total'] ?? 0;
 
 // 2a. Previous Week's Sales for Comparison
-$prev_week_sales_stmt = $conn->prepare("
-    SELECT SUM(TotalAmount) as total_sales
-    FROM SalesTransactions
-    WHERE BranchID = ? AND WEEK(TransactionDateTime) = WEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK)) AND YEAR(TransactionDateTime) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 WEEK))
-");
-$prev_week_sales_stmt->execute([$current_branch_id]);
-$prev_week_sales = $prev_week_sales_stmt->fetch(PDO::FETCH_ASSOC);
-$prev_week_sales_total = $prev_week_sales['total_sales'] ?? 0;
+$prev_week_sales = getSingleResult($conn, 'SP_GetPreviousWeekSales', [$current_branch_id]);
+$prev_week_sales_total = $prev_week_sales['prev_week_sales_total'] ?? 0;
 
 // Calculate Weekly Comparison
 $week_comparison = '';
@@ -94,24 +93,12 @@ if ($prev_week_sales_total > 0) {
 }
 
 // 3. This Month's Sales
-$month_sales_stmt = $conn->prepare("
-    SELECT SUM(TotalAmount) as total_sales
-    FROM SalesTransactions
-    WHERE BranchID = ? AND MONTH(TransactionDateTime) = MONTH(CURDATE()) AND YEAR(TransactionDateTime) = YEAR(CURDATE())
-");
-$month_sales_stmt->execute([$current_branch_id]);
-$month_sales = $month_sales_stmt->fetch(PDO::FETCH_ASSOC);
-$month_sales_total = $month_sales['total_sales'] ?? 0;
+$month_sales = getSingleResult($conn, 'SP_GetMonthlySales', [$current_branch_id]);
+$month_sales_total = $month_sales['month_sales_total'] ?? 0;
 
 // 3a. Previous Month's Sales for Comparison
-$prev_month_sales_stmt = $conn->prepare("
-    SELECT SUM(TotalAmount) as total_sales
-    FROM SalesTransactions
-    WHERE BranchID = ? AND MONTH(TransactionDateTime) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) AND YEAR(TransactionDateTime) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-");
-$prev_month_sales_stmt->execute([$current_branch_id]);
-$prev_month_sales = $prev_month_sales_stmt->fetch(PDO::FETCH_ASSOC);
-$prev_month_sales_total = $prev_month_sales['total_sales'] ?? 0;
+$prev_month_sales = getSingleResult($conn, 'SP_GetPreviousMonthSales', [$current_branch_id]);
+$prev_month_sales_total = $prev_month_sales['prev_month_sales_total'] ?? 0;
 
 // Calculate Monthly Comparison
 $month_comparison = '';
@@ -125,172 +112,86 @@ if ($prev_month_sales_total > 0) {
     $month_comparison_class = 'text-text-light';
 }
 
-$low_stock_stmt = $conn->prepare("
-    SELECT COUNT(*) as count FROM BranchInventory 
-    WHERE BranchID = ? AND Stocks > 0 AND Stocks <= 10
-");
-$low_stock_stmt->execute([$current_branch_id]);
-$low_stock = $low_stock_stmt->fetch(PDO::FETCH_ASSOC)['count'];
+// 4. Inventory Counts - Special handling for multiple result sets
+$inventory_stmt = executeStoredProcedure($conn, 'SP_GetInventoryCounts', [$current_branch_id]);
+$low_stock = $inventory_stmt->fetch(PDO::FETCH_ASSOC)['low_stock_count'] ?? 0;
+$inventory_stmt->nextRowset();
+$out_of_stock = $inventory_stmt->fetch(PDO::FETCH_ASSOC)['out_of_stock_count'] ?? 0;
+$inventory_stmt->nextRowset();
+$expiring_soon = $inventory_stmt->fetch(PDO::FETCH_ASSOC)['expiring_soon_count'] ?? 0;
+$inventory_stmt->nextRowset();
+$expired = $inventory_stmt->fetch(PDO::FETCH_ASSOC)['expired_count'] ?? 0;
+$inventory_stmt->nextRowset();
+$total_active = $inventory_stmt->fetch(PDO::FETCH_ASSOC)['total_active_count'] ?? 0;
+$inventory_stmt->closeCursor();
 
-$out_of_stock_stmt = $conn->prepare("
-    SELECT COUNT(*) as count FROM BranchInventory 
-    WHERE BranchID = ? AND Stocks = 0
-");
-$out_of_stock_stmt->execute([$current_branch_id]);
-$out_of_stock = $out_of_stock_stmt->fetch(PDO::FETCH_ASSOC)['count'];
-
-$expiring_soon_stmt = $conn->prepare("
-    SELECT COUNT(*) as count FROM BranchInventory 
-    WHERE BranchID = ? AND ExpiryDate BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-");
-$expiring_soon_stmt->execute([$current_branch_id]);
-$expiring_soon = $expiring_soon_stmt->fetch(PDO::FETCH_ASSOC)['count'];
-
-$expired_stmt = $conn->prepare("
-    SELECT COUNT(*) as count FROM BranchInventory 
-    WHERE BranchID = ? AND ExpiryDate < CURDATE()
-");
-$expired_stmt->execute([$current_branch_id]);
-$expired = $expired_stmt->fetch(PDO::FETCH_ASSOC)['count'];
-
-$total_active_stmt = $conn->prepare("
-    SELECT COUNT(*) as count FROM BranchInventory 
-    WHERE BranchID = ? AND Stocks > 0 AND ExpiryDate > CURDATE()
-");
-$total_active_stmt->execute([$current_branch_id]);
-$total_active = $total_active_stmt->fetch(PDO::FETCH_ASSOC)['count'];
-
-// 5. Top Selling Medicines
-$top_sellers_stmt = $conn->prepare(
-    "SELECT m.MedicineName, SUM(ti.Quantity) as total_qty, SUM(ti.Subtotal) as total_revenue
-    FROM TransactionItems ti
-    JOIN SalesTransactions st ON ti.TransactionID = st.TransactionID
-    JOIN BranchInventory bi ON ti.BranchInventoryID = bi.BranchInventoryID
-    JOIN medicines m ON bi.MedicineID = m.MedicineID
-    WHERE st.BranchID = :branch_id AND st.TransactionDateTime >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-    GROUP BY m.MedicineName
-    ORDER BY total_revenue DESC
-    LIMIT 5
-");
-$top_sellers_stmt->bindValue(':branch_id', $current_branch_id, PDO::PARAM_INT);
-$top_sellers_stmt->execute();
-$top_sellers = $top_sellers_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// 6. Recent Transactions
-$recent_trans_stmt = $conn->prepare("
-    SELECT TransactionID, TransactionDateTime, TotalAmount, PaymentMethod
-    FROM SalesTransactions
-    WHERE BranchID = ?
-    ORDER BY TransactionDateTime DESC
-    LIMIT 10
-");
-$recent_trans_stmt->execute([$current_branch_id]);
-$recent_transactions = $recent_trans_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// 7. Low Stock Medicines
-$low_stock_medicines_stmt = $conn->prepare("
-    SELECT m.MedicineName, bi.Stocks, bi.Price, bi.Status
-    FROM BranchInventory bi
-    JOIN medicines m ON bi.MedicineID = m.MedicineID
-    WHERE bi.BranchID = ? AND bi.Stocks > 0 AND bi.Stocks <= 15
-    ORDER BY bi.Stocks ASC
-    LIMIT 8
-");
-$low_stock_medicines_stmt->execute([$current_branch_id]);
-$low_stock_medicines = $low_stock_medicines_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// 8. Payment Method Data
-$payment_method_stmt = $conn->prepare("
-    SELECT PaymentMethod, COUNT(*) as count, SUM(TotalAmount) as total
-    FROM SalesTransactions
-    WHERE BranchID = ? AND TransactionDateTime >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
-    GROUP BY PaymentMethod
-");
-$payment_method_stmt->execute([$current_branch_id]);
-$payment_methods = $payment_method_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// 9. Daily Sales Last 7 Days
-$daily_sales_stmt = $conn->prepare("
-    SELECT DATE(TransactionDateTime) as sale_date, SUM(TotalAmount) as daily_total, COUNT(*) as trans_count
-    FROM SalesTransactions
-    WHERE BranchID = ? AND TransactionDateTime >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-    GROUP BY DATE(TransactionDateTime)
-    ORDER BY sale_date ASC
-");
-$daily_sales_stmt->execute([$current_branch_id]);
-$daily_sales_data = $daily_sales_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// 10. Monthly Prescription vs OTC Trends (last 7 months) - classify by simple keyword regex on medicine name/form
-$keywords = ['amox','amoxi','insulin','injection','syrup','tablet','capsule','antibiotic','antidepress','anticonvuls','antihypertens','prescription'];
-$regex = implode('|', array_map(function($k){ return preg_quote(strtolower($k), '/'); }, $keywords));
-
-$monthly_stmt = $conn->prepare(
-    "SELECT DATE_FORMAT(st.TransactionDateTime, '%Y-%m') as ym,
-            DATE_FORMAT(st.TransactionDateTime, '%b') as month_label,
-            SUM(CASE WHEN LOWER(m.MedicineName) REGEXP :regex OR LOWER(m.Form) REGEXP :regex THEN ti.Subtotal ELSE 0 END) as prescriptions,
-            SUM(CASE WHEN NOT (LOWER(m.MedicineName) REGEXP :regex OR LOWER(m.Form) REGEXP :regex) THEN ti.Subtotal ELSE 0 END) as otc
-     FROM TransactionItems ti
-     JOIN SalesTransactions st ON ti.TransactionID = st.TransactionID
-     JOIN BranchInventory bi ON ti.BranchInventoryID = bi.BranchInventoryID
-     JOIN medicines m ON bi.MedicineID = m.MedicineID
-        WHERE st.BranchID = :branch_id AND st.TransactionDateTime >= DATE_SUB(CURDATE(), INTERVAL 7 MONTH)
-        GROUP BY ym, month_label
-     ORDER BY ym ASC"
-);
-$monthly_stmt->bindValue(':branch_id', $current_branch_id, PDO::PARAM_INT);
-$monthly_stmt->bindValue(':regex', $regex);
-$monthly_stmt->execute();
-$monthly_raw = $monthly_stmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Build ordered last-7-months array including months with zero values
-$monthlyData = [];
-$now = new DateTime();
-for ($i = 6; $i >= 0; $i--) {
-    $dt = (clone $now)->modify("-{$i} months");
-    $ym = $dt->format('Y-m');
-    $label = $dt->format('M');
-    $monthlyData[$ym] = [ 'month' => $label, 'prescriptions' => 0.0, 'otc' => 0.0 ];
+// 5. Top Selling Medicines - with error handling
+try {
+    $top_sellers_stmt = executeStoredProcedure($conn, 'SP_GetTopSellers', [$current_branch_id, 5]);
+    $top_sellers = $top_sellers_stmt->fetchAll(PDO::FETCH_ASSOC);
+    $top_sellers_stmt->closeCursor();
+} catch (PDOException $e) {
+    // Log error and set empty array
+    error_log("Top sellers error: " . $e->getMessage());
+    $top_sellers = [];
 }
-foreach ($monthly_raw as $r) {
-    $ym = $r['ym'];
-    if (isset($monthlyData[$ym])) {
-        $monthlyData[$ym]['prescriptions'] = (float)$r['prescriptions'];
-        $monthlyData[$ym]['otc'] = (float)$r['otc'];
+// 6. Payment Method Data
+$payment_method_stmt = executeStoredProcedure($conn, 'SP_GetPaymentMethods', [$current_branch_id]);
+$payment_methods = $payment_method_stmt->fetchAll(PDO::FETCH_ASSOC);
+$payment_method_stmt->closeCursor();
+
+// Process payment methods data
+$payment_data = [
+    'Cash' => ['amount' => 0, 'count' => 0],
+    'Card' => ['amount' => 0, 'count' => 0],
+    'Credit' => ['amount' => 0, 'count' => 0]
+];
+
+foreach ($payment_methods as $method) {
+    $payment_method = $method['PaymentMethod'];
+    if (isset($payment_data[$payment_method])) {
+        $payment_data[$payment_method]['amount'] = $method['total'] ?? 0;
+        $payment_data[$payment_method]['count'] = $method['count'] ?? 0;
     }
 }
 
-// 11. Top 10 Bestselling Medicines (by total quantity sold)
-// If $current_branch_id is set (>0) we filter to that branch, otherwise across all branches
-if (!empty($current_branch_id)) {
-    $top_sellers_sql = "SELECT m.MedicineID, m.MedicineName, SUM(ti.Quantity) AS total_qty, SUM(ti.Subtotal) AS total_sales
-        FROM TransactionItems ti
-        JOIN SalesTransactions st ON ti.TransactionID = st.TransactionID
-        JOIN BranchInventory bi ON ti.BranchInventoryID = bi.BranchInventoryID
-        JOIN medicines m ON bi.MedicineID = m.MedicineID
-        WHERE st.BranchID = :branch_id
-        GROUP BY m.MedicineID, m.MedicineName
-        ORDER BY total_qty DESC
-        LIMIT 10";
-    $top_stmt = $conn->prepare($top_sellers_sql);
-    $top_stmt->bindValue(':branch_id', $current_branch_id, PDO::PARAM_INT);
-    $top_stmt->execute();
-} else {
-    $top_sellers_sql = "SELECT m.MedicineID, m.MedicineName, SUM(ti.Quantity) AS total_qty, SUM(ti.Subtotal) AS total_sales
-        FROM TransactionItems ti
-        JOIN SalesTransactions st ON ti.TransactionID = st.TransactionID
-        JOIN BranchInventory bi ON ti.BranchInventoryID = bi.BranchInventoryID
-        JOIN medicines m ON bi.MedicineID = m.MedicineID
-        GROUP BY m.MedicineID, m.MedicineName
-        ORDER BY total_qty DESC
-        LIMIT 10";
-    $top_stmt = $conn->prepare($top_sellers_sql);
-    $top_stmt->execute();
-}
-$top_raw = $top_stmt->fetchAll(PDO::FETCH_ASSOC);
+// 7. Weekly Sales Data (Last 7 Days)
+$weekly_sales_stmt = executeStoredProcedure($conn, 'SP_GetWeeklySalesData', [$current_branch_id]);
+$weekly_sales_data = $weekly_sales_stmt->fetchAll(PDO::FETCH_ASSOC);
+$weekly_sales_stmt->closeCursor();
 
-// Build top sellers array
+// Build complete weekly data array with all days
+$weeklyData = [];
+$now = new DateTime();
+for ($i = 6; $i >= 0; $i--) {
+    $dt = (clone $now)->modify("-{$i} days");
+    $date = $dt->format('Y-m-d');
+    $day = $dt->format('D'); // Short day name (Mon, Tue, etc.)
+    
+    // Find matching sales data
+    $daily_sales = 0;
+    foreach ($weekly_sales_data as $sale) {
+        if ($sale['sale_date'] == $date) {
+            $daily_sales = (float)$sale['daily_total'];
+            break;
+        }
+    }
+    
+    $weeklyData[] = [
+        'date' => $date,
+        'day' => $day,
+        'sales' => $daily_sales
+    ];
+}
+
+// 8. Top 10 Bestselling Medicines
+$top_bestsellers_stmt = executeStoredProcedure($conn, 'SP_GetTopBestsellers', [$current_branch_id]);
+$top_bestsellers = $top_bestsellers_stmt->fetchAll(PDO::FETCH_ASSOC);
+$top_bestsellers_stmt->closeCursor();
+
+// Build top sellers array for JavaScript
 $topSellers = [];
-foreach ($top_raw as $r) {
+foreach ($top_bestsellers as $r) {
     $topSellers[] = [
         'medicine' => $r['MedicineName'],
         'quantity' => (int)$r['total_qty'],
@@ -390,19 +291,20 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
             }
         }
 
-        // --- Data from server (Monthly Prescription vs OTC Trends and Top Sellers) ---
-        const monthlyData = <?php echo json_encode(array_values($monthlyData), JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP); ?>;
+        // --- Data from server (Weekly Sales Data and Top Sellers) ---
+        const weeklyData = <?php echo json_encode(array_values($weeklyData), JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP); ?>;
         const topSellersData = <?php echo json_encode($topSellers, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP); ?>;
+        const paymentData = <?php echo json_encode($payment_data, JSON_HEX_TAG|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_AMP); ?>;
 
         // Compute sensible maxima for chart scaling (fallback to 1 to avoid divide-by-zero)
         <?php
-            $maxTrend = 1;
-            $prescVals = array_column($monthlyData, 'prescriptions');
-            $otcVals = array_column($monthlyData, 'otc');
-            if (!empty($prescVals) || !empty($otcVals)) {
-                $maxTrend = max(max($prescVals ?: [0]), max($otcVals ?: [0]), 1);
-                // add 10% headroom
-                $maxTrend = ceil($maxTrend * 1.1);
+            $maxWeekly = 1;
+            $weeklySales = array_column($weeklyData, 'sales');
+            if (!empty($weeklySales)) {
+                $maxWeekly = max($weeklySales);
+                // Add 20% headroom and round up to nearest 50k
+                $maxWeekly = ceil(($maxWeekly * 1.2) / 50000) * 50000;
+                if ($maxWeekly < 50000) $maxWeekly = 50000;
             }
             $maxSellersQty = 1;
             $qtys = array_map(function($t){ return $t['quantity']; }, $topSellers);
@@ -411,16 +313,16 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
                 $maxSellersQty = ceil($maxSellersQty * 1.1);
             }
         ?>
-        const MAX_TREND_VALUE = <?php echo (int)$maxTrend; ?>;
+        const MAX_WEEKLY_VALUE = <?php echo (int)$maxWeekly; ?>;
         const MAX_SELLERS_QTY = <?php echo (int)$maxSellersQty; ?>;
 
         // --- Functions ---
 
         /**
-         * Renders the Monthly Prescription Trends Bar Chart.
+         * Renders the Weekly Sales Trend Chart.
          */
-        function renderMonthlyTrendsChart() {
-            const chartContainer = document.getElementById('prescription-trends-chart');
+        function renderWeeklySalesChart() {
+            const chartContainer = document.getElementById('weekly-sales-chart');
             if (!chartContainer) return;
             chartContainer.innerHTML = '';
             
@@ -428,21 +330,17 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
                 return (value / max) * 100;
             }
 
-            monthlyData.forEach(data => {
-                const prescriptionHeight = getBarHeight(data.prescriptions, MAX_TREND_VALUE) * 0.8;
-                const otcHeight = getBarHeight(data.otc, MAX_TREND_VALUE) * 0.8;
-
+            weeklyData.forEach(data => {
+                const barHeight = getBarHeight(data.sales, MAX_WEEKLY_VALUE);
+                
                 const group = document.createElement('div');
-                group.className = 'bar-group flex w-1/7 h-full items-end justify-center px-1';
+                group.className = 'bar-group flex flex-col items-center justify-end h-full px-1 relative';
                 
                 group.innerHTML = `
-                    <div class="relative w-5 h-[${otcHeight}%] bg-gray-300 rounded-t-sm mx-1 bar-chart-bar group">
-                        <div class="bar-tooltip group-hover:opacity-100" style="left: 50%; top: 0px;">${data.otc} OTC</div>
+                    <div class="relative w-8 bg-pharmacy-primary rounded-t-sm bar-chart-bar group" style="height: ${barHeight}%">
+                        <div class="bar-tooltip">₱${data.sales.toLocaleString()}</div>
                     </div>
-                    <div class="relative w-5 h-[${prescriptionHeight}%] bg-pharmacy-primary rounded-t-sm mx-1 bar-chart-bar group">
-                        <div class="bar-tooltip group-hover:opacity-100" style="left: 50%; top: 0px;">${data.prescriptions} Presc.</div>
-                    </div>
-                    <span class="absolute -bottom-6 text-xs text-text-light">${data.month}</span>
+                    <span class="absolute -bottom-6 text-xs text-text-light whitespace-nowrap">${data.day}</span>
                 `;
                 chartContainer.appendChild(group);
             });
@@ -500,6 +398,24 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
             const labelContainer = document.getElementById('traffic-x-labels');
             if (labelContainer) labelContainer.innerHTML = '';
         }
+
+        /**
+         * Updates payment method data
+         */
+        function updatePaymentMethods() {
+            if (paymentData.Cash) {
+                document.getElementById('pay-cash-amt').textContent = '₱' + (paymentData.Cash.amount || 0).toLocaleString();
+                document.getElementById('pay-cash-count').textContent = (paymentData.Cash.count || 0) + ' transactions';
+            }
+            if (paymentData.Card) {
+                document.getElementById('pay-card-amt').textContent = '₱' + (paymentData.Card.amount || 0).toLocaleString();
+                document.getElementById('pay-card-count').textContent = (paymentData.Card.count || 0) + ' transactions';
+            }
+            if (paymentData.Credit) {
+                document.getElementById('pay-credit-amt').textContent = '₱' + (paymentData.Credit.amount || 0).toLocaleString();
+                document.getElementById('pay-credit-count').textContent = (paymentData.Credit.count || 0) + ' transactions';
+            }
+        }
         
         /**
          * Updates the clock and shift status dynamically with real-time data.
@@ -552,8 +468,9 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
         // --- Initialization ---
         window.onload = function() {
             // Render Charts
-            renderMonthlyTrendsChart();
+            renderWeeklySalesChart();
             renderFootTrafficChart();
+            updatePaymentMethods();
 
             // Initialize clock dynamically and update every second
             updateClockDynamic();
@@ -699,22 +616,34 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
                 </div>
             </div>
 
-            <!-- 2. Payment Method Breakdown (Live Data) -->
-            <div class="bg-card-bg p-6 rounded-xl shadow-lg flex flex-col justify-between border-t-4 border-pharmacy-primary">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="p-2 icon-info rounded-lg">
-                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+            <div class="bg-card-bg p-6 rounded-xl shadow-lg flex flex-col justify-between border-t-4 border-warning-yellow">
+                    <div class="mb-2">
+                        <p class="text-sm text-text-light font-semibold mb-3">Payment Methods (30 days)</p>
+                        <div class="space-y-3">
+                            <div class="flex justify-between items-center text-sm">
+                                <div class="flex items-center text-text-dark"><span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>Cash:</div>
+                                <div class="text-right">
+                                    <span id="pay-cash-amt" class="font-bold block">--</span>
+                                    <span id="pay-cash-count" class="text-xs text-text-light">--</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <div class="flex items-center text-text-dark"><span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>Card:</div>
+                                <div class="text-right">
+                                    <span id="pay-card-amt" class="font-bold block">--</span>
+                                    <span id="pay-card-count" class="text-xs text-text-light">--</span>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center text-sm">
+                                <div class="flex items-center text-text-dark"><span class="w-2 h-2 bg-purple-500 rounded-full mr-2"></span>Credit:</div>
+                                <div class="text-right">
+                                    <span id="pay-credit-amt" class="font-bold block">--</span>
+                                    <span id="pay-credit-count" class="text-xs text-text-light">--</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="flex flex-col">
-                    <p class="text-sm mb-1 text-text-light">Payment Methods (30 days)</p>
-                    <ul class="text-xs text-text-medium font-medium">
-                        <?php foreach($payment_methods as $pm): ?>
-                        <li><?php echo htmlspecialchars($pm['PaymentMethod']); ?>: ₱<?php echo number_format($pm['total'],2); ?> (<?php echo $pm['count']; ?> txns)</li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            </div>
 
             <!-- 3. Expiring Soon (Live Data) -->
             <div class="bg-card-bg p-6 rounded-xl shadow-lg flex flex-col justify-between border-t-4 border-success-green">
@@ -735,42 +664,33 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
         <!-- Middle Section: Trends and Inventory Status (2/3 vs 1/3 split) -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
 
-            <!-- 1. Prescription Trends Chart (2/3 width) -->
+            <!-- 1. Weekly Sales Trend (Daily Breakdown) - Takes 2/3 width -->
             <div class="lg:col-span-2 bg-card-bg p-6 rounded-xl shadow-lg">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-xl font-semibold text-text-dark">Monthly Prescription & OTC Trends (Last 7 Months)</h2>
-                    <div class="flex items-center space-x-4">
-                        <div class="flex items-center text-sm text-text-light">
-                            <span class="w-3 h-3 bg-gray-400 rounded-full mr-2"></span> OTC Sales
-                        </div>
-                        <div class="flex items-center text-sm text-text-light">
-                            <span class="w-3 h-3 bg-pharmacy-primary rounded-full mr-2"></span> Prescriptions
-                        </div>
+                <h2 class="text-xl font-semibold text-text-dark mb-6">Weekly Sales Trend (Daily)</h2>
+                <!-- Set chart container to fixed height (h-72) for consistent sizing -->
+                <div class="relative h-72 w-full">
+                    
+                    <!-- Y-Axis Labels - Aligned with grid lines using flex-col justify-between.
+                         Bottom margin matches grid bottom offset. -->
+                    <div class="absolute left-0 top-0 bottom-6 w-14 flex flex-col justify-between text-xs text-text-light text-right pr-2">
+                        <span>₱<?php echo number_format($maxWeekly, 0); ?></span>
+                        <span>₱<?php echo number_format($maxWeekly * 0.75, 0); ?></span>
+                        <span>₱<?php echo number_format($maxWeekly * 0.5, 0); ?></span>
+                        <span>₱<?php echo number_format($maxWeekly * 0.25, 0); ?></span>
+                        <span>0</span>
                     </div>
-                </div>
 
-                <!-- Bar Chart Implementation -->
-                <div class="relative h-64 w-full flex items-end justify-around pb-4">
-                    <!-- Y-axis labels -->
-                    <div class="absolute left-0 top-0 bottom-0 w-10 flex flex-col justify-between text-xs text-text-light text-right pr-2">
-                        <span>8K</span>
-                        <span>6K</span>
-                        <span>4K</span>
-                        <span>2K</span>
-                        <span>0K</span>
-                    </div>
-                    <!-- Horizontal lines -->
-                    <div class="absolute left-10 right-0 top-0 bottom-0 border-l border-gray-200">
+                    <!-- Chart Area - bottom-6 leaves room for X-axis labels. border-l and border-b create the axis lines. -->
+                    <div class="absolute left-14 right-0 top-0 bottom-6 border-l border-b border-gray-200">
+                        <!-- Grid Lines -->
                         <div class="absolute w-full border-b border-gray-200" style="top: 0%"></div>
                         <div class="absolute w-full border-b border-gray-200" style="top: 25%"></div>
                         <div class="absolute w-full border-b border-gray-200" style="top: 50%"></div>
                         <div class="absolute w-full border-b border-gray-200" style="top: 75%"></div>
-                        <div class="absolute w-full border-b border-gray-200" style="top: 100%"></div>
-                    </div>
-
-                    <!-- Chart Container for JavaScript to populate -->
-                    <div id="prescription-trends-chart" class="flex justify-around items-end h-full w-[calc(100%-40px)] ml-auto relative">
-                        <!-- Content populated by JavaScript -->
+                        <!-- 100% line is covered by the main container border-b -->
+                        
+                        <!-- Bars Container - aligned to bottom of grid area -->
+                        <div id="weekly-sales-chart" class="absolute inset-0 flex justify-around items-end w-full px-1"></div>
                     </div>
                 </div>
             </div>
@@ -860,38 +780,13 @@ $alerts_count = $low_stock + $out_of_stock + $expiring_soon + $expired;
             </div>
         </div>
 
-        <!-- Foot Traffic Chart (Bottom Full Width) -->
-        <div class="mt-6 bg-card-bg p-6 rounded-xl shadow-lg">
+        <!-- Top 10 Bestselling Medicines -->
+        <div class="bg-card-bg p-6 rounded-xl shadow-lg flex flex-col mb-8">
             <h2 class="text-xl font-semibold text-text-dark mb-6">Top 10 Bestselling Medicines (by Quantity)</h2>
-            <div class="relative min-h-[170px] h-auto w-full flex flex-col justify-end pb-4">
-                <!-- Y-axis labels -->
-                <div class="absolute left-0 top-0 bottom-0 w-10 flex flex-col justify-between text-xs text-text-light text-right pr-2 min-h-[170px] h-auto mt-auto mb-4">
-                    <span>60+</span>
-                    <span>40</span>
-                    <span>20</span>
-                    <span>0</span>
-                </div>
-                <!-- Chart Area -->
-                <div class="flex-grow relative min-h-[170px] h-auto w-full pl-10">
-                    <!-- Horizontal lines -->
-                    <div class="absolute inset-0 border-l border-gray-200">
-                        <div class="absolute w-full border-b border-gray-200" style="top: 0%"></div>
-                        <div class="absolute w-full border-b border-gray-200" style="top: 33%"></div>
-                        <div class="absolute w-full border-b border-gray-200" style="top: 66%"></div>
-                        <div class="absolute w-full border-b border-gray-200" style="top: 99%"></div>
-                    </div>
-                    <!-- Chart Container for JavaScript to populate -->
-                    <div id="foot-traffic-chart" class="h-full w-full relative">
-                        <!-- SVG content populated by JavaScript -->
-                    </div>
-                </div>
-                <!-- X-axis labels -->
-                <div id="traffic-x-labels" class="flex justify-between w-full pl-10 pt-2">
-                    <!-- Labels populated by JavaScript -->
-                </div>
+            <div class="relative w-full flex-grow overflow-y-auto pr-2" id="foot-traffic-chart">
+                <!-- Dynamic Rows populated by JS -->
             </div>
         </div>
-
 
     </div>
 </main>

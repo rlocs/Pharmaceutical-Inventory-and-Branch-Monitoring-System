@@ -1049,5 +1049,178 @@ BEGIN
     UPDATE ToDoList SET IsDone = p_IsDone WHERE TaskID = p_TaskID AND UserID = p_UserID;
 END //
 
+-- Add these stored procedures to your pharmaceutical_db.sql file
+
+-- KPIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+
+-- Stored Procedure for Dashboard KPIs
+CREATE PROCEDURE SP_GetDashboardKPIs (
+    IN p_BranchID INT
+)
+BEGIN
+    -- Today's Sales
+    SELECT 
+        COALESCE(SUM(TotalAmount), 0) as today_sales_total,
+        COUNT(*) as today_transactions
+    FROM SalesTransactions 
+    WHERE BranchID = p_BranchID AND DATE(TransactionDateTime) = CURDATE();
+END //
+
+-- Stored Procedure for Weekly Sales
+CREATE PROCEDURE SP_GetWeeklySales (
+    IN p_BranchID INT
+)
+BEGIN
+    -- This Week's Sales
+    SELECT 
+        COALESCE(SUM(TotalAmount), 0) as week_sales_total
+    FROM SalesTransactions
+    WHERE BranchID = p_BranchID 
+    AND WEEK(TransactionDateTime) = WEEK(CURDATE()) 
+    AND YEAR(TransactionDateTime) = YEAR(CURDATE());
+END //
+
+-- Stored Procedure for Previous Week Sales
+CREATE PROCEDURE SP_GetPreviousWeekSales (
+    IN p_BranchID INT
+)
+BEGIN
+    -- Previous Week's Sales
+    SELECT 
+        COALESCE(SUM(TotalAmount), 0) as prev_week_sales_total
+    FROM SalesTransactions
+    WHERE BranchID = p_BranchID 
+    AND WEEK(TransactionDateTime) = WEEK(DATE_SUB(CURDATE(), INTERVAL 1 WEEK)) 
+    AND YEAR(TransactionDateTime) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 WEEK));
+END //
+
+-- Stored Procedure for Monthly Sales
+CREATE PROCEDURE SP_GetMonthlySales (
+    IN p_BranchID INT
+)
+BEGIN
+    -- This Month's Sales
+    SELECT 
+        COALESCE(SUM(TotalAmount), 0) as month_sales_total
+    FROM SalesTransactions
+    WHERE BranchID = p_BranchID 
+    AND MONTH(TransactionDateTime) = MONTH(CURDATE()) 
+    AND YEAR(TransactionDateTime) = YEAR(CURDATE());
+END //
+
+-- Stored Procedure for Previous Month Sales
+CREATE PROCEDURE SP_GetPreviousMonthSales (
+    IN p_BranchID INT
+)
+BEGIN
+    -- Previous Month's Sales
+    SELECT 
+        COALESCE(SUM(TotalAmount), 0) as prev_month_sales_total
+    FROM SalesTransactions
+    WHERE BranchID = p_BranchID 
+    AND MONTH(TransactionDateTime) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) 
+    AND YEAR(TransactionDateTime) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH));
+END //
+
+-- Stored Procedure for Inventory Counts
+CREATE PROCEDURE SP_GetInventoryCounts (
+    IN p_BranchID INT
+)
+BEGIN
+    -- Low Stock
+    SELECT COUNT(*) as low_stock_count
+    FROM BranchInventory 
+    WHERE BranchID = p_BranchID AND Stocks > 0 AND Stocks <= 10;
+    
+    -- Out of Stock
+    SELECT COUNT(*) as out_of_stock_count
+    FROM BranchInventory 
+    WHERE BranchID = p_BranchID AND Stocks = 0;
+    
+    -- Expiring Soon
+    SELECT COUNT(*) as expiring_soon_count
+    FROM BranchInventory 
+    WHERE BranchID = p_BranchID AND ExpiryDate BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY);
+    
+    -- Expired
+    SELECT COUNT(*) as expired_count
+    FROM BranchInventory 
+    WHERE BranchID = p_BranchID AND ExpiryDate < CURDATE();
+    
+    -- Total Active
+    SELECT COUNT(*) as total_active_count
+    FROM BranchInventory 
+    WHERE BranchID = p_BranchID AND Stocks > 0 AND ExpiryDate > CURDATE();
+END //
+
+-- Stored Procedure for Top Selling Medicines
+
+DELIMITER //
+
+CREATE PROCEDURE SP_GetTopSellers(
+    IN p_BranchID INT,
+    IN p_LimitCount INT
+)
+BEGIN
+    SELECT 
+        m.MedicineName,
+        SUM(ti.Quantity) as total_qty,
+        SUM(ti.Subtotal) as total_sales
+    FROM TransactionItems ti
+    JOIN SalesTransactions st ON ti.TransactionID = st.TransactionID
+    JOIN BranchInventory bi ON ti.BranchInventoryID = bi.BranchInventoryID
+    JOIN medicines m ON bi.MedicineID = m.MedicineID
+    WHERE st.BranchID = p_BranchID
+      AND st.TransactionDateTime >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+    GROUP BY m.MedicineID, m.MedicineName
+    ORDER BY total_qty DESC
+    LIMIT p_LimitCount;
+END //
+
+DELIMITER ;
+
+
+-- Stored Procedure for Payment Methods
+CREATE PROCEDURE SP_GetPaymentMethods (
+    IN p_BranchID INT
+)
+BEGIN
+    SELECT PaymentMethod, COUNT(*) as count, SUM(TotalAmount) as total
+    FROM SalesTransactions
+    WHERE BranchID = p_BranchID AND TransactionDateTime >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+    GROUP BY PaymentMethod;
+END //
+
+-- Stored Procedure for Weekly Sales Data (Last 7 Days)
+CREATE PROCEDURE SP_GetWeeklySalesData (
+    IN p_BranchID INT
+)
+BEGIN
+    SELECT DATE(TransactionDateTime) as sale_date, 
+           DAYNAME(TransactionDateTime) as day_name, 
+           SUM(TotalAmount) as daily_total, 
+           COUNT(*) as trans_count
+    FROM SalesTransactions
+    WHERE BranchID = p_BranchID AND TransactionDateTime >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+    GROUP BY DATE(TransactionDateTime), DAYNAME(TransactionDateTime)
+    ORDER BY sale_date ASC;
+END //
+
+-- Stored Procedure for Top 10 Bestselling Medicines
+CREATE PROCEDURE SP_GetTopBestsellers (
+    IN p_BranchID INT
+)
+BEGIN
+    SELECT m.MedicineID, m.MedicineName, SUM(ti.Quantity) AS total_qty, SUM(ti.Subtotal) AS total_sales
+    FROM TransactionItems ti
+    JOIN SalesTransactions st ON ti.TransactionID = st.TransactionID
+    JOIN BranchInventory bi ON ti.BranchInventoryID = bi.BranchInventoryID
+    JOIN medicines m ON bi.MedicineID = m.MedicineID
+    WHERE st.BranchID = p_BranchID
+    GROUP BY m.MedicineID, m.MedicineName
+    ORDER BY total_qty DESC
+    LIMIT 10;
+END //
+
 DELIMITER ;
 

@@ -254,9 +254,9 @@ try {
         
         <div class="mb-4">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Quantity</label>
-<input type="number" id="qty_input" value="" placeholder="Enter quantity"
-       class="w-full bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300"
-       onclick="activeTarget='qty'; updateInputHighlight();">
+            <input type="number" id="qty_input" value="" placeholder=""
+                   class="w-full bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300"
+                   onclick="activeTarget='qty'; updateInputHighlight();">
         </div>
         <div class="mb-4">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Discount & VAT</label>
