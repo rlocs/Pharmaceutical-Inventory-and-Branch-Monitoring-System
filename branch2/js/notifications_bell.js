@@ -1,4 +1,4 @@
-// Notification Bell Client Logic (enhanced with search and load more)
+// Notification Bell Client Logic - UPDATED for NotificationReadState
 (function(){
   const bellButton = document.getElementById('notification-bell-btn');
   const dropdown = document.getElementById('notification-dropdown');
@@ -23,8 +23,10 @@
   if (!bellButton || !dropdown) return;
 
   let pollingInterval = null;
-  let limit = 50; // can increase with load more
+  let chatPollingInterval = null;
+  let limit = 50;
   let filterText = '';
+  let previousUnreadCount = 0;
 
   function timeAgo(ts){
     const dt = new Date(ts);
@@ -39,18 +41,130 @@
     return String(str).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[s]));
   }
 
+  // Check for new chat messages
+  async function checkChatMessages() {
+    try {
+      const res = await fetch('api/chat_api.php?action=get_conversations', {
+        credentials: 'same-origin'
+      });
+      const data = await res.json();
+      
+      if (data.success && data.conversations) {
+        let newMessages = [];
+        
+        data.conversations.forEach(conv => {
+          if (conv.UnreadCount > 0) {
+            // Check if this is a new message that needs notification
+            const messageKey = `chat_msg_${conv.ConversationID}_${conv.LastMessageTimestamp}`;
+            const alreadyNotified = localStorage.getItem(messageKey);
+            
+            if (!alreadyNotified) {
+              newMessages.push({
+                conversationId: conv.ConversationID,
+                from: `${conv.FirstName} ${conv.LastName}`,
+                message: conv.LastMessage || 'New message',
+                timestamp: conv.LastMessageTimestamp
+              });
+              
+              // Mark as notified in localStorage
+              localStorage.setItem(messageKey, 'true');
+              
+              console.log('💬 NEW CHAT MESSAGE:', `${conv.FirstName}: ${conv.LastMessage}`);
+            }
+          }
+        });
+        
+        // Show notification for new messages
+        if (newMessages.length > 0) {
+          showNewMessageNotification(newMessages);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking chat messages:', error);
+    }
+  }
+
+  // Show desktop notifications for new messages
+  function showNewMessageNotification(messages) {
+    if (!('Notification' in window)) {
+      return;
+    }
+
+    if (Notification.permission === 'granted') {
+      if (messages.length === 1) {
+        const message = messages[0];
+        const notification = new Notification(`💬 New message from ${message.from}`, {
+          body: message.message,
+          icon: '/favicon.ico',
+          tag: 'chat-message'
+        });
+
+        notification.onclick = function() {
+          window.focus();
+          // Open notification dropdown on chat tab
+          if (dropdown.classList.contains('hidden')) {
+            dropdown.classList.remove('hidden');
+          }
+          switchToTab('chat');
+          notification.close();
+        };
+
+        setTimeout(() => {
+          notification.close();
+        }, 7000);
+        
+      } else if (messages.length > 1) {
+        const notification = new Notification(`💬 ${messages.length} new messages`, {
+          body: `From ${messages.map(m => m.from).join(', ')}`,
+          icon: '/favicon.ico',
+          tag: 'chat-messages'
+        });
+
+        notification.onclick = function() {
+          window.focus();
+          if (dropdown.classList.contains('hidden')) {
+            dropdown.classList.remove('hidden');
+          }
+          switchToTab('chat');
+          notification.close();
+        };
+
+        setTimeout(() => {
+          notification.close();
+        }, 7000);
+      }
+    } else if (Notification.permission === 'default') {
+      Notification.requestPermission().then(function(permission) {
+        if (permission === 'granted') {
+          showNewMessageNotification(messages);
+        }
+      });
+    }
+  }
+
   async function fetchSummary(){
     try {
       const res = await fetch('api/notifications.php?action=summary', {credentials:'same-origin'});
-      const ct = res.headers.get('content-type') || '';
-      if (ct.indexOf('application/json') === -1) {
-        console.error('Summary: Non-JSON response', res.status, await res.text());
-        return;
-      }
       const data = await res.json();
-      if (!data.success) { console.warn('Summary: Not successful', data); return; }
+      
+      if (!data.success) { 
+        return { total: 0, chat: 0, alerts: 0 };
+      }
+      
       const total = data.summary.total || 0;
-      unreadTotalEl && (unreadTotalEl.textContent = total);
+      
+      // Check if total unread count increased
+      if (total > previousUnreadCount && previousUnreadCount > 0) {
+        console.log(`🔔 New notifications detected: ${previousUnreadCount} → ${total}`);
+        // Check for new chat messages specifically
+        await checkChatMessages();
+      }
+      
+      previousUnreadCount = total;
+      
+      // Update display
+      if (unreadTotalEl) unreadTotalEl.textContent = total;
+      
       if (total > 0) {
         badge.classList.remove('hidden');
         countEl.classList.remove('hidden');
@@ -60,8 +174,11 @@
         countEl.classList.add('hidden');
         countEl.textContent = '';
       }
+      
+      return data.summary;
     } catch (e) {
       console.error('Summary fetch error:', e);
+      return { total: 0, chat: 0, alerts: 0 };
     }
   }
 
@@ -113,7 +230,8 @@
       el.addEventListener('click', async () => {
         const id = el.getAttribute('data-id');
         const link = el.getAttribute('data-link');
-        // mark as read
+        
+        // Mark as read using NotificationReadState
         if (id) {
           try {
             await fetch('api/notifications.php?action=mark_read', {
@@ -122,7 +240,8 @@
             });
           } catch(e){}
         }
-        // navigate
+        
+        // Navigate
         if (link && link !== '#') window.location.href = link;
         refresh();
       });
@@ -135,14 +254,8 @@
               : `api/notifications.php?action=list&type=all&limit=${limit}`;
     try {
       const res = await fetch(url, {credentials:'same-origin'});
-      const ct = res.headers.get('content-type') || '';
-      if (ct.indexOf('application/json') === -1) {
-        const text = await res.text();
-        console.error(`List (${which}): Non-JSON response`, res.status, text);
-        return [];
-      }
       const data = await res.json();
-      if (!data.success) { console.warn(`List (${which}): Not successful`, data); return []; }
+      if (!data.success) { return []; }
       return data.notifications || [];
     } catch (e) {
       console.error(`List (${which}) fetch error:`, e);
@@ -170,36 +283,57 @@
   function startPolling(){
     if (pollingInterval) clearInterval(pollingInterval);
     pollingInterval = setInterval(refresh, 15000);
+    
+    // Check for new chat messages more frequently
+    if (chatPollingInterval) clearInterval(chatPollingInterval);
+    chatPollingInterval = setInterval(checkChatMessages, 10000);
+  }
+
+  function switchToTab(tabName) {
+    document.querySelectorAll('.notification-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.notification-tab[data-tab="${tabName}"]`).classList.add('active');
+    
+    listAll.classList.add('hidden');
+    listAlerts.classList.add('hidden');
+    listChat.classList.add('hidden');
+    
+    if (tabName === 'alerts') {
+      listAlerts.classList.remove('hidden');
+    } else if (tabName === 'chat') {
+      listChat.classList.remove('hidden');
+    } else {
+      listAll.classList.remove('hidden');
+    }
   }
 
   // Toggle dropdown
   bellButton.addEventListener('click', () => {
     dropdown.classList.toggle('hidden');
-    if (!dropdown.classList.contains('hidden')) refresh();
+    if (!dropdown.classList.contains('hidden')) {
+      refresh();
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
   });
+  
   closeBtn?.addEventListener('click', () => dropdown.classList.add('hidden'));
 
   // Tab switching
   document.querySelectorAll('.notification-tab').forEach(tab => {
     tab.addEventListener('click', async () => {
-      document.querySelectorAll('.notification-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
       const tabName = tab.getAttribute('data-tab');
-      listAll.classList.add('hidden');
-      listAlerts.classList.add('hidden');
-      listChat.classList.add('hidden');
+      switchToTab(tabName);
+      
       if (tabName === 'alerts') {
-        listAlerts.classList.remove('hidden');
         const items = await fetchList('alerts');
         renderList(listAlerts, items);
         emptyAlerts.classList.toggle('hidden', (items||[]).length > 0);
       } else if (tabName === 'chat') {
-        listChat.classList.remove('hidden');
         const items = await fetchList('chat');
         renderList(listChat, items);
         emptyChat.classList.toggle('hidden', (items||[]).length > 0);
       } else {
-        listAll.classList.remove('hidden');
         const items = await fetchList('all');
         renderList(listAll, items);
         emptyAll.classList.toggle('hidden', (items||[]).length > 0);
@@ -231,6 +365,17 @@
   });
 
   // Initialize
-  refresh();
-  startPolling();
+  function initialize() {
+    // Request notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    
+    refresh();
+    startPolling();
+    
+    console.log('🔔 Notification system started with NotificationReadState support');
+  }
+
+  initialize();
 })();

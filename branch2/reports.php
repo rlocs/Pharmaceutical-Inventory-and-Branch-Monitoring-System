@@ -1,6 +1,7 @@
 <?php
 // Start the session on every page
 session_start();
+require_once '../dbconnection.php';
 
 // ------------------------------------------------------------------
 // ACCESS CONTROL CHECK
@@ -17,8 +18,8 @@ if ($_SESSION["user_role"] !== 'Staff' && $_SESSION["user_role"] !== 'Admin') {
     die("ERROR: You do not have permission to view this page.");
 }
 
-// 3. Check Branch (Crucial for Staff access). This file is for Branch 1.
-// Admins are not restricted by BranchID, but Staff MUST be from Branch 1.
+// 3. Check Branch access.
+// Admins unrestricted; Staff must match required branch.
 $required_branch_id = 2;
 if ($required_branch_id > 0 && $_SESSION["user_role"] === 'Staff' && $_SESSION["branch_id"] != $required_branch_id) {
     // Redirect staff who ended up on the wrong branch page
@@ -36,13 +37,34 @@ $user_full_name = htmlspecialchars($_SESSION['first_name'] ?? 'Staff') . ' ' . h
 $user_role = htmlspecialchars($_SESSION['user_role'] ?? 'Staff');
 $current_branch_id = $_SESSION['branch_id'];
 
-// Mock Branch Name lookup (Replace with actual database query if needed)
-$branch_names = [
-    1 => 'Lipa, Batangas',
-    2 => 'Sto Tomas, Batangas',
-    3 => 'Malvar, Batangas'
-];
-$branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}";
+// Initialize variables with fallback values
+$branch_name = "Branch {$current_branch_id}";
+$branch_address = '123 Main Street, City Center';
+$staff_phone = '(043) 123-4567';
+
+try {
+    $db = new Database();
+    $pdo = $db->getConnection();
+
+    // Fetch branch details
+    $branch_sql = "SELECT BranchName, BranchAddress FROM Branches WHERE BranchID = ?";
+    $branch_stmt = $pdo->prepare($branch_sql);
+    $branch_stmt->execute([$current_branch_id]);
+    $branch = $branch_stmt->fetch(PDO::FETCH_ASSOC);
+
+    $branch_name = $branch['BranchName'] ?? "Branch {$current_branch_id}";
+    $branch_address = $branch['BranchAddress'] ?? '123 Main Street, City Center';
+
+    // Fetch current staff's personal phone number
+    $phone_sql = "SELECT PersonalPhoneNumber FROM Details WHERE UserID = ?";
+    $phone_stmt = $pdo->prepare($phone_sql);
+    $phone_stmt->execute([$_SESSION['user_id']]);
+    $staff_phone = $phone_stmt->fetchColumn() ?? '(043) 123-4567';
+
+} catch (Exception $e) {
+    // Fallback values already set above
+    error_log("Error fetching branch/staff details in reports.php: " . $e->getMessage());
+}
 
 // NOTE: You'll need to update your b-login.php to also pull FirstName and LastName 
 // and store them in the session for this to work perfectly.
@@ -53,7 +75,8 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reports</title>
+    <title>Sales Ledger & Receipts - Branch <?php echo $required_branch_id; ?></title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     
     <!-- Load Tailwind CSS CDN and Configuration -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -71,6 +94,7 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
     <script src="js/medicine.js" defer></script>
     <script src="js/alerts.js" defer></script>
     <!-- Custom CSS Styles are in css/style.css -->
+    <link rel="stylesheet" href="css/reports.css">
 </head>
 <body class="overflow-x-hidden">
 
@@ -103,7 +127,7 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
         </header>
 
         <!-- 2. SECONDARY NAVIGATION BAR (Light Cream/White) -->
-        <nav class="bg-[#F4F6FA] border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
+        <nav id="secondary-nav" class="bg-[#F4F6FA] border-b border-gray-200 flex justify-between items-center px-6 py-3 shadow-sm sticky top-16 z-20">
             
             <!-- Navigation Links - INCREASED TEXT SIZE to text-base -->
             <div class="flex space-x-8 text-base font-medium">
@@ -123,51 +147,105 @@ $branch_name = $branch_names[$current_branch_id] ?? "Branch {$current_branch_id}
 
         <!-- 3. MAIN CONTENT AREA (Cream Background) -->
         <main class="bg-custom-bg-white p-6 flex-grow h-full relative z-10">
-            <div class="main-content flex-1 p-6 lg:p-10 overflow-y-auto bg-main-bg-color">
-                <h2 id="page-title" class="text-4xl font-extrabold text-gray-900 mb-4">
-                    Reports 
+            <!-- Page Header -->
+            <div class="mb-6">
+                <h1 class="text-3xl font-bold text-gray-800 mb-2 flex items-center gap-2"><i data-lucide="scroll-text"></i> Sales Ledger & Receipts</h1>
+                <p class="text-gray-600">Branch <?php echo $required_branch_id; ?> Repository</p>
+            </div>
+            <!-- Sales Summary -->
+            <div class="bg-[#F4F6FA] p-6 rounded-3xl shadow-lg border border-gray-100 mt-6">
+                <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <i data-lucide="bar-chart-3"></i> Sales Summary
                 </h2>
-                <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-100">
-                <h2 class="text-3xl font-bold text-gray-900 mb-4">Branch <?php echo $current_branch_id; ?> Repository</h2>
-                <div class="mb-4 text-gray-700 font-semibold">
-                    <input type="text" id="date-picker" class="input-control date-box flatpickr-input active" placeholder="Filter by Date" readonly="readonly">
+                <div id="summary-container" class="text-center text-gray-500">
+                    Loading summary data...
                 </div>
-                <div class="flex flex-wrap items-center justify-between mb-6 gap-4">
-                    <div class="flex items-center space-x-2">
-                        <label for="searchOrderId" class="text-gray-600 font-medium">Search Order ID:</label>
-                        <input type="text" id="searchOrderId" name="searchOrderId" placeholder="e.g., 1024" class="border border-gray-300 rounded px-3 py-1 focus:outline-none focus:ring-2 focus:ring-blue-600">
-                        <button id="refreshBtn" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white rounded px-4 py-1 shadow transition duration-150">Refresh</button>
+            </div>
+            <!-- Controls Section -->
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+                
+                <div class="flex flex-wrap gap-4 items-center justify-between">
+                    
+                
+                    <!-- Search and Filter Controls -->
+                    <div class="flex flex-wrap gap-4 items-center">
+                        <div class="relative">
+                            <input type="text" id="date-picker" placeholder="Click to select date range" class="pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64 cursor-pointer" readonly>
+                            <svg class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <svg class="absolute right-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </div>
+
+                        <div class="relative">
+                            <input type="text" id="search-input" placeholder="Search Order ID (e.g., 1024)" class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64">
+                            <svg class="absolute left-3 top-2.5 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                            </svg>
+                        </div>
+
                     </div>
-                    <button id="exportCsvBtn" class="bg-green-600 hover:bg-green-700 text-white font-semibold rounded px-4 py-1 shadow transition duration-150">
-                        Export CSV
-                    </button>
-                </div>
-                <div class="overflow-x-auto border border-gray-300 rounded-lg shadow-sm">
-                    <table class="min-w-full bg-white text-sm text-left text-gray-900">
-                        <thead class="bg-gray-100 text-gray-600 uppercase font-semibold">
-                            <tr>
-                                <th class="px-4 py-3 border-b border-gray-300">Order ID</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Date &amp; Time</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Items Count</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Payment</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Total Amount</th>
-                                <th class="px-4 py-3 border-b border-gray-300">Receipt Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="repositoryTableBody">
-                            <!-- Dynamic Rows will be inserted here by JS -->
-                        </tbody>
-                    </table>
+                    
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex gap-3">
+                        <button id="refresh-btn" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition duration-150 flex items-center gap-2">
+                            <i data-lucide="refresh-cw" size="16"></i> Refresh
+                        </button>
+                        
+                        <button id="export-btn" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition duration-150 flex items-center gap-2">
+                            <i data-lucide="download" size="16"></i> Export CSV
+                        </button>
+                    </div>
                 </div>
             </div>
 
+
+            <!-- Reports Table -->
+            <div class="bg-[#F4F6FA] p-6 rounded-3xl shadow-lg border border-gray-100">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full bg-[#F4F6FA] border-separate" style="border-spacing: 0 0.5rem;">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="text-left py-3 px-4 font-semibold text-sm text-gray-600 uppercase tracking-wider rounded-l-lg">Trans ID</th>
+                                <th class="text-left py-3 px-4 font-semibold text-sm text-gray-600 uppercase tracking-wider">Date & Time</th>
+                                <th class="text-left py-3 px-4 font-semibold text-sm text-gray-600 uppercase tracking-wider">Items Count</th>
+                                <th class="text-left py-3 px-4 font-semibold text-sm text-gray-600 uppercase tracking-wider">Payment</th>
+                                <th class="text-left py-3 px-4 font-semibold text-sm text-gray-600 uppercase tracking-wider" style="text-align: right;">Total Amount</th>
+                                <th class="text-center py-3 px-4 font-semibold text-sm text-gray-600 uppercase tracking-wider rounded-r-lg">Receipt Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-table-body" class="text-gray-700">
+                            <tr><td colspan="6" class="px-6 py-4 text-center text-sm text-gray-500">Loading records...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination Container -->
+                <div id="pagination-container" class="bg-white px-4 py-3 border-t border-gray-200 sm:px-6 mt-6">
+                    <!-- Pagination will be rendered here by JavaScript -->
+                </div>
+            </div>
+
+
+
+    
         </main>
 
     </div>
-
+    <!-- Include Invoice Modal for consistent receipt display -->
+    <?php include __DIR__ . '/includes/invoice_modal.php'; ?>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script>
+      const BRANCH_ID = <?php echo $required_branch_id; ?>;
+      const DEFAULT_CASHIER = "<?php echo $user_full_name; ?>";
+      lucide.createIcons();
+    </script>
+    <script src="js/reports.js"></script>
     <?php include __DIR__ . '/includes/sidebar.php'; ?>
-    <script src="js/report_table.js"></script>
-    <!-- Combined JavaScript Logic (from script.js and inline functions) -->
+
 
     <script src="js/chat.js?v=<?php echo time(); ?>"></script>
         <script src="js/notifications_bell.js" defer></script>

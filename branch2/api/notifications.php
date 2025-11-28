@@ -1,6 +1,6 @@
 <?php
 // notifications.php - Backend API for bell notifications
-// Provides list/summary, mark read, and creation hook
+// UPDATED for NotificationReadState table
 
 header('Content-Type: application/json');
 session_start();
@@ -14,48 +14,29 @@ function json_response($data, $code = 200) {
 }
 
 try {
-    // For testing purposes, allow access without authentication if no session exists
-    $userId = (int)($_SESSION['user_id'] ?? 1); // Default to user ID 1 for testing
-    $branchId = (int)($_SESSION['branch_id'] ?? 1); // Default to branch ID 1 for testing
+    $userId = (int)($_SESSION['user_id'] ?? 1);
+    $branchId = (int)($_SESSION['branch_id'] ?? 1);
 
     $db = new Database();
     $pdo = $db->getConnection();
-
-    // Ensure Notifications table exists (idempotent) - matches pharmaceutical_db.sql schema
-    $pdo->exec("CREATE TABLE IF NOT EXISTS Notifications (
-        NotificationID INT AUTO_INCREMENT PRIMARY KEY,
-        UserID INT NULL,
-        BranchID INT NOT NULL DEFAULT 1,
-        Type VARCHAR(50) NOT NULL DEFAULT 'system',
-        Category VARCHAR(100) NULL,
-        Title VARCHAR(255) NOT NULL,
-        Message TEXT NOT NULL,
-        Link VARCHAR(255) NULL,
-        ResourceType VARCHAR(50) NULL,
-        ResourceID INT NULL,
-        Severity VARCHAR(20) DEFAULT 'info',
-        IsRead TINYINT(1) NOT NULL DEFAULT 0,
-        CreatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UpdatedAt TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_user_isread (UserID, IsRead, CreatedAt),
-        INDEX idx_branch_created (BranchID, CreatedAt),
-        INDEX idx_type_category (Type, Category, CreatedAt),
-        INDEX idx_resource (ResourceType, ResourceID)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;");
 
     $action = $_GET['action'] ?? $_POST['action'] ?? 'list';
 
     switch ($action) {
         case 'summary':
-            // Count unread for current user in this branch
+            // Count unread notifications for current user using NotificationReadState
             $stmt = $pdo->prepare("SELECT 
-                    SUM(CASE WHEN IsRead = 0 THEN 1 ELSE 0 END) AS total,
-                    SUM(CASE WHEN IsRead = 0 AND Type = 'chat' THEN 1 ELSE 0 END) AS chat,
-                    SUM(CASE WHEN IsRead = 0 AND Type IN ('inventory','med','pos','reports','account') THEN 1 ELSE 0 END) AS alerts
-                FROM Notifications 
-                WHERE BranchID = ? AND (UserID IS NULL OR UserID = ?) ");
-            $stmt->execute([$branchId, $userId]);
+                    COUNT(*) as total,
+                    SUM(CASE WHEN n.Type = 'chat' THEN 1 ELSE 0 END) as chat,
+                    SUM(CASE WHEN n.Type IN ('inventory','med','pos','reports','account') THEN 1 ELSE 0 END) as alerts
+                FROM Notifications n
+                LEFT JOIN NotificationReadState nrs ON n.NotificationID = nrs.NotificationID AND nrs.UserID = ?
+                WHERE n.BranchID = ? 
+                AND (n.UserID IS NULL OR n.UserID = ?)
+                AND (nrs.IsRead = 0 OR nrs.IsRead IS NULL)");
+            $stmt->execute([$userId, $branchId, $userId]);
             $row = $stmt->fetch(PDO::FETCH_ASSOC) ?: ['total'=>0,'chat'=>0,'alerts'=>0];
+            
             json_response(['success'=>true,'summary'=>[
                 'total'=>(int)$row['total'],
                 'chat'=>(int)$row['chat'],
@@ -66,19 +47,35 @@ try {
         case 'list':
             $type = $_GET['type'] ?? 'all';
             $limit = min(max((int)($_GET['limit'] ?? 50), 1), 200);
-            $where = "BranchID = :bid AND (UserID IS NULL OR UserID = :uid)";
+            
+            $where = "n.BranchID = :bid AND (n.UserID IS NULL OR n.UserID = :uid)";
             $params = [':bid' => $branchId, ':uid' => $userId];
+            
             if ($type === 'alerts') {
-                $where .= " AND Type IN ('inventory','med','pos','reports','account')";
+                $where .= " AND n.Type IN ('inventory','med','pos','reports','account')";
             } elseif ($type === 'chat') {
-                $where .= " AND Type = 'chat'";
+                $where .= " AND n.Type = 'chat'";
             }
-            $sql = "SELECT NotificationID, Type, Category, Title, Message, Link, IsRead, CreatedAt
-                    FROM Notifications WHERE $where
-                    ORDER BY IsRead ASC, CreatedAt DESC
-                    LIMIT :lim";
+            
+            $sql = "SELECT 
+                    n.NotificationID,
+                    n.Type,
+                    n.Category,
+                    n.Title,
+                    n.Message,
+                    n.Link,
+                    n.Severity,
+                    n.CreatedAt,
+                    COALESCE(nrs.IsRead, 0) as IsRead
+                FROM Notifications n
+                LEFT JOIN NotificationReadState nrs ON n.NotificationID = nrs.NotificationID AND nrs.UserID = :uid
+                WHERE $where
+                ORDER BY COALESCE(nrs.IsRead, 0) ASC, n.CreatedAt DESC
+                LIMIT :lim";
+                
             $stmt = $pdo->prepare($sql);
             foreach ($params as $k=>$v) $stmt->bindValue($k, $v, PDO::PARAM_INT);
+            $stmt->bindValue(':uid', $userId, PDO::PARAM_INT);
             $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
             $stmt->execute();
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -89,14 +86,49 @@ try {
             $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
             $nid = (int)($input['notification_id'] ?? 0);
             if ($nid <= 0) json_response(['success'=>false,'error'=>'Notification ID required'], 400);
-            $stmt = $pdo->prepare("UPDATE Notifications SET IsRead = 1 WHERE NotificationID = ? AND BranchID = ? AND (UserID IS NULL OR UserID = ?)");
-            $stmt->execute([$nid, $branchId, $userId]);
+            
+            // Insert or update in NotificationReadState
+            $stmt = $pdo->prepare("INSERT INTO NotificationReadState (NotificationID, UserID, IsRead, ReadAt) 
+                                  VALUES (?, ?, 1, NOW()) 
+                                  ON DUPLICATE KEY UPDATE IsRead = 1, ReadAt = NOW()");
+            $stmt->execute([$nid, $userId]);
             json_response(['success'=>true]);
             break;
 
         case 'mark_all_read':
-            $stmt = $pdo->prepare("UPDATE Notifications SET IsRead = 1 WHERE BranchID = ? AND (UserID IS NULL OR UserID = ?)");
-            $stmt->execute([$branchId, $userId]);
+            $type = $_GET['type'] ?? $_POST['type'] ?? 'all';
+            
+            // First get all unread notification IDs for this user
+            $where = "n.BranchID = ? AND (n.UserID IS NULL OR n.UserID = ?)";
+            $params = [$branchId, $userId];
+            
+            if ($type === 'alerts') {
+                $where .= " AND n.Type IN ('inventory','med','pos','reports','account')";
+            } elseif ($type === 'chat') {
+                $where .= " AND n.Type = 'chat'";
+            }
+            
+            $sql = "SELECT n.NotificationID 
+                    FROM Notifications n
+                    LEFT JOIN NotificationReadState nrs ON n.NotificationID = nrs.NotificationID AND nrs.UserID = ?
+                    WHERE $where AND (nrs.IsRead = 0 OR nrs.IsRead IS NULL)";
+            
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute($params);
+            $notificationIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+            
+            // Mark each as read
+            if (!empty($notificationIds)) {
+                $placeholders = str_repeat('?,', count($notificationIds) - 1) . '?';
+                $stmt = $pdo->prepare("INSERT INTO NotificationReadState (NotificationID, UserID, IsRead, ReadAt) 
+                                      VALUES " . 
+                                      implode(',', array_map(function($id) use ($userId) {
+                                          return "($id, $userId, 1, NOW())";
+                                      }, $notificationIds)) . 
+                                      " ON DUPLICATE KEY UPDATE IsRead = 1, ReadAt = NOW()");
+                $stmt->execute();
+            }
+            
             json_response(['success'=>true]);
             break;
 
@@ -108,22 +140,51 @@ try {
             $title = trim($input['title'] ?? 'Notification');
             $message = trim($input['message'] ?? '');
             $link = trim($input['link'] ?? '');
+            $severity = trim($input['severity'] ?? 'info');
             $targetUserId = isset($input['user_id']) ? (int)$input['user_id'] : $userId;
             $targetBranchId = isset($input['branch_id']) ? (int)$input['branch_id'] : $branchId;
 
-            $stmt = $pdo->prepare("INSERT INTO Notifications (UserID, BranchID, Type, Category, Title, Message, Link, IsRead) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
-            $stmt->execute([$targetUserId, $targetBranchId, $type, $category, $title, $message, $link]);
-            json_response(['success'=>true, 'id' => (int)$pdo->lastInsertId()]);
+            $stmt = $pdo->prepare("INSERT INTO Notifications 
+                                  (UserID, BranchID, Type, Category, Title, Message, Link, Severity) 
+                                  VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->execute([$targetUserId, $targetBranchId, $type, $category, $title, $message, $link, $severity]);
+            
+            $notificationId = (int)$pdo->lastInsertId();
+            
+            // For chat messages, create a desktop notification
+            if ($type === 'chat') {
+                // This will trigger the frontend to show a notification
+                json_response([
+                    'success' => true, 
+                    'id' => $notificationId,
+                    'is_chat' => true,
+                    'message' => $message,
+                    'from' => $title
+                ]);
+            } else {
+                json_response(['success' => true, 'id' => $notificationId]);
+            }
             break;
 
-        case 'debug_recent':
-            // Return latest 50 notifications for debugging (no session filter)
-            $limit = min(max((int)($_GET['limit'] ?? 50), 1), 200);
-            $stmt = $pdo->prepare("SELECT * FROM Notifications ORDER BY CreatedAt DESC LIMIT :lim");
-            $stmt->bindValue(':lim', $limit, PDO::PARAM_INT);
-            $stmt->execute();
+        case 'get_chat_notifications':
+            // Specifically get chat notifications for the bell
+            $limit = min(max((int)($_GET['limit'] ?? 20), 1), 100);
+            
+            $stmt = $pdo->prepare("SELECT 
+                    n.NotificationID,
+                    n.Title,
+                    n.Message,
+                    n.Link,
+                    n.CreatedAt,
+                    COALESCE(nrs.IsRead, 0) as IsRead
+                FROM Notifications n
+                LEFT JOIN NotificationReadState nrs ON n.NotificationID = nrs.NotificationID AND nrs.UserID = ?
+                WHERE n.BranchID = ? AND n.Type = 'chat' AND (n.UserID IS NULL OR n.UserID = ?)
+                ORDER BY n.CreatedAt DESC
+                LIMIT ?");
+            $stmt->execute([$userId, $branchId, $userId, $limit]);
             $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-            json_response(['success'=>true, 'count'=>count($rows), 'notifications'=>$rows]);
+            json_response(['success'=>true,'notifications'=>$rows]);
             break;
 
         default:
