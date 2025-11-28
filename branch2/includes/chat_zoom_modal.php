@@ -471,99 +471,167 @@
     </div>
 
     <script>
+        // Global state for zoom window
+        const zoomState = {
+            currentChatId: null,
+            currentPartnerLabel: '',
+            messages: []
+        };
+
         // Receive data from parent window
         window.addEventListener('message', (event) => {
-            if (event.data.type === 'LOAD_CHAT') {
-                const zoomContent = document.getElementById('zoom-content');
-                zoomContent.innerHTML = event.data.html;
-                
-                // Update send button styling in zoom modal and set up modal handlers
-                setTimeout(() => {
-                    const sendBtn = zoomContent.querySelector('#send-btn');
-                    if (sendBtn) {
-                        sendBtn.style.background = 'transparent';
-                        sendBtn.style.color = '#4f46e5';
-                        sendBtn.style.border = 'none';
-                        sendBtn.style.borderRadius = '0';
-                        sendBtn.style.padding = '8px';
-                        const svg = sendBtn.querySelector('svg');
-                        if (svg) {
-                            svg.style.width = '24px';
-                            svg.style.height = '24px';
-                        }
-                    }
-                    
-                    // Set up close button for new chat modal in zoom window
-                    const closeModalBtn = document.querySelector('#new-chat-modal button[onclick="window.closeNewChatModal()"]');
-                    if (closeModalBtn) {
-                        closeModalBtn.onclick = function(e) {
-                            e.preventDefault();
-                            window.closeNewChatModal();
-                        };
-                    }
-                    
-                    // Set up click outside to close modal in zoom window
-                    const clickHandler = function(e) {
-                        const newChatModal = document.getElementById('new-chat-modal');
-                        if (newChatModal && !newChatModal.classList.contains('hidden')) {
-                            const modalContent = newChatModal.querySelector('div > div');
-                            if (modalContent && !modalContent.contains(e.target) && e.target === newChatModal) {
-                                window.closeNewChatModal();
-                            }
-                        }
-                    };
-                    document.addEventListener('click', clickHandler);
-                }, 100);
+    if (event.data.type === 'LOAD_CHAT') {
+        const zoomContent = document.getElementById('zoom-content');
+        zoomContent.innerHTML = event.data.html;
+        
+        // Store the current user ID from the main window
+        if (event.data.currentUserId) {
+            window.currentUserId = event.data.currentUserId;
+        }
+        
+        // Initialize the zoom window functionality
+        setTimeout(() => {
+            initializeZoomWindow();
+        }, 100);
+    }
+});
+
+function initializeZoomWindow() {
+    // Set up event listeners for buttons
+    setupZoomEventListeners();
+    
+    // Load conversations
+    fetchConversationsForZoom();
+    
+    // Start polling for new messages in zoom window
+    startMessagePollingForZoom();
+}
+
+        function setupZoomEventListeners() {
+            // Send message button
+            const sendBtn = document.querySelector('#send-btn');
+            if (sendBtn) {
+                sendBtn.onclick = window.sendMessage;
             }
-        });
+
+            // Message input enter key
+            const messageInput = document.getElementById('message-input');
+            if (messageInput) {
+                messageInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        window.sendMessage();
+                    }
+                });
+            }
+
+            // Back button
+            const backButton = document.getElementById('back-button');
+            if (backButton) {
+                backButton.onclick = () => window.switchView('list');
+            }
+
+            // New chat button
+            const newChatBtn = document.querySelector('button[onclick="window.openNewChatModal()"]');
+            if (newChatBtn) {
+                newChatBtn.onclick = window.openNewChatModal;
+            }
+
+            // Zoom button
+            const zoomBtn = document.querySelector('button[onclick="toggleZoom()"]');
+            if (zoomBtn) {
+                zoomBtn.onclick = window.toggleZoom;
+            }
+
+            // Clear messages button
+            const clearBtn = document.getElementById('clear-messages-btn');
+            if (clearBtn) {
+                clearBtn.onclick = window.clearMessages;
+            }
+
+            // Close modal button
+            const closeModalBtn = document.querySelector('#new-chat-modal button[onclick="window.closeNewChatModal()"]');
+            if (closeModalBtn) {
+                closeModalBtn.onclick = window.closeNewChatModal;
+            }
+
+            // Click outside to close modal
+            document.addEventListener('click', (e) => {
+                const newChatModal = document.getElementById('new-chat-modal');
+                if (newChatModal && !newChatModal.classList.contains('hidden')) {
+                    const modalContent = newChatModal.querySelector('div > div');
+                    if (modalContent && !modalContent.contains(e.target) && e.target === newChatModal) {
+                        window.closeNewChatModal();
+                    }
+                }
+            });
+        }
+
+        // API request function for zoom window
+        function apiRequest(action, params = {}, method = 'GET') {
+            // FIXED: Use correct API path - go up one level since zoom modal is in includes folder
+            const apiBase = '../api/chat_api.php';
+            const opts = { method, credentials: 'same-origin' };
+            
+            if (method === 'GET') {
+                const qs = new URLSearchParams({ action, ...params }).toString();
+                url = apiBase + '?' + qs;
+            } else {
+                const formData = new FormData();
+                formData.append('action', action);
+                Object.keys(params).forEach(key => {
+                    formData.append(key, params[key]);
+                });
+                opts.body = formData;
+                url = apiBase;
+            }
+            
+            return fetch(url, opts)
+                .then(response => {
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        throw new Error('Server returned non-JSON response.');
+                    }
+                    return response.json();
+                })
+                .catch(error => {
+                    console.error('API request failed:', error);
+                    throw error;
+                });
+        }
+
+        function escapeHtml(s) {
+            if (s === undefined || s === null) return '';
+            return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
+        }
+
+        function initials(name) {
+            const parts = String(name || '').trim().split(/\s+/);
+            const first = parts[0] ? parts[0][0] : '';
+            const second = parts[1] ? parts[1][0] : '';
+            return (first + second).toUpperCase() || '?';
+        }
+
+        function fmtTime(ts) {
+            if (!ts) return '';
+            const d = new Date(ts);
+            return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        }
 
         // Make functions available globally for zoom window
         window.openNewChatModal = function() {
             const modal = document.getElementById('new-chat-modal');
             if (modal) {
                 modal.classList.remove('hidden');
-                // Fetch users for the modal
-                fetchUsersForNewChatInZoomWindowSelf();
+                fetchUsersForNewChat();
             }
         };
         
-        function fetchUsersForNewChatInZoomWindowSelf() {
+        function fetchUsersForNewChat() {
             const usersList = document.getElementById('new-chat-users-list');
             if (!usersList) return;
             
             usersList.innerHTML = '<p class="text-center text-gray-500 text-sm p-6">Loading users...</p>';
-            
-            const apiBase = 'api/chat_api.php';
-            const currentUserId = Number(window.opener ? window.opener.currentUserId : (window.currentUserId || 0));
-            
-            function apiRequest(action, params = {}, method = 'GET') {
-                let url = apiBase;
-                const opts = { method, credentials: 'same-origin' };
-                if (method === 'GET') {
-                    const qs = new URLSearchParams({ action, ...params }).toString();
-                    url = apiBase + '?' + qs;
-                } else {
-                    const formData = new FormData();
-                    formData.append('action', action);
-                    Object.keys(params).forEach(key => {
-                        formData.append(key, params[key]);
-                    });
-                    opts.body = formData;
-                }
-                return fetch(url, opts).then(r => r.json());
-            }
-            
-            function escapeHtml(s) {
-                if (s === undefined || s === null) return '';
-                return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
-            }
-            
-            function initials(name) {
-                const parts = String(name || '').trim().split(/\s+/);
-                const first = parts[0] ? parts[0][0] : '';
-                const second = parts[1] ? parts[1][0] : '';
-                return (first + second).toUpperCase() || '?';
-            }
             
             apiRequest('get_users', {}, 'GET').then(res => {
                 if (!res.success) {
@@ -578,7 +646,7 @@
                 const seenUserIds = new Set();
                 
                 users.forEach(user => {
-                    if (user.UserID && user.UserID != currentUserId && !seenUserIds.has(user.UserID)) {
+                    if (user.UserID && !seenUserIds.has(user.UserID)) {
                         seenUserIds.add(user.UserID);
                         uniqueUsers.push(user);
                     }
@@ -597,7 +665,7 @@
                     
                     return `
                     <div class="conversation-item p-3 flex items-center space-x-3 rounded-xl cursor-pointer shadow-sm border transition hover:bg-gray-100 mb-2" 
-                         onclick="window.startConversationWithUserInZoom(${user.UserID}, '${escapeHtml(name + (branchName ? ' (' + branchName + ')' : ''))}')">
+                         onclick="window.startConversationWithUser(${user.UserID}, '${escapeHtml(name + (branchName ? ' (' + branchName + ')' : ''))}')">
                         <div class="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
                             ${escapeHtml(initials(name))}
                         </div>
@@ -620,27 +688,19 @@
             }
         };
         
-        window.startConversationWithUserInZoom = async function(userId, label) {
-            // Create conversation directly in zoom window
+        window.startConversationWithUser = async function(userId, label) {
             try {
-                const formData = new FormData();
-                formData.append('action', 'create_conversation');
-                formData.append('recipient_id', userId);
-                
-                const response = await fetch('api/chat_api.php', {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin'
-                });
-                
-                const res = await response.json();
+                const res = await apiRequest('create_conversation', { recipient_id: userId }, 'POST');
                 
                 if (res.success && res.conversation_id) {
                     // Close the modal
                     window.closeNewChatModal();
                     
-                    // Reload the zoom window to show the new conversation
-                    window.location.reload();
+                    // Open the new conversation
+                    window.openConversation(res.conversation_id, label);
+                    
+                    // Refresh conversations list
+                    fetchConversationsForZoom();
                 } else {
                     alert('Failed to create conversation: ' + (res.error || 'Unknown error'));
                 }
@@ -649,24 +709,262 @@
                 alert('Error starting conversation: ' + err.message);
             }
         };
-        
+
+        // Fetch conversations for zoom window
+        function fetchConversationsForZoom() {
+            const listContainer = document.getElementById('conversations-list');
+            if (!listContainer) return;
+
+            listContainer.innerHTML = '<p class="text-center text-gray-500 text-sm p-6">Loading conversations...</p>';
+            
+            apiRequest('get_conversations', {}, 'GET').then(res => {
+                if (!res.success) {
+                    listContainer.innerHTML = '<p class="text-center text-red-500 text-sm p-6">Failed to load conversations</p>';
+                    return;
+                }
+                
+                const conversations = res.conversations || [];
+                
+                if (conversations.length === 0) {
+                    listContainer.innerHTML = `
+                        <div class="p-2 text-xs text-center text-gray-500 border-b border-gray-200 mb-2">
+                            Start a conversation
+                        </div>
+                        <p class="text-center text-gray-500 text-sm p-6">No conversations yet. Click + to start a new one!</p>
+                    `;
+                    return;
+                }
+
+                listContainer.innerHTML = `
+                    <div class="p-2 text-xs text-center text-gray-500 border-b border-gray-200 mb-2">
+                        Your Conversations
+                    </div>
+                ` + conversations.map(c => {
+                    const name = escapeHtml((c.FirstName || 'Unknown') + (c.LastName ? ' ' + c.LastName : ''));
+                    const branch = escapeHtml(c.BranchName || '');
+                    const lastMessage = escapeHtml(c.LastMessage || '');
+                    const isActive = zoomState.currentChatId === parseInt(c.ConversationID);
+                    const activeClass = isActive ? 'bg-indigo-50 border-indigo-200' : 'hover:bg-gray-100';
+                    const unreadCount = parseInt(c.UnreadCount || 0);
+                    const hasUnread = unreadCount > 0;
+
+                    return `
+                    <div class="conversation-item p-3 flex items-center space-x-3 rounded-xl cursor-pointer shadow-sm border transition ${activeClass}" 
+                         onclick="window.openConversation(${c.ConversationID}, '${escapeHtml((c.FirstName || '') + (c.LastName ? ' ' + c.LastName : '') + (c.BranchName ? ' (' + c.BranchName + ')' : ''))}')">
+                        <div class="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
+                            ${escapeHtml(initials(name))}
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex justify-between items-start">
+                                <p class="font-semibold text-gray-800 truncate">${name}</p>
+                                ${hasUnread ? `<span class="bg-red-500 text-white text-xs rounded-full px-2 py-1 min-w-5 h-5 flex items-center justify-center">${unreadCount}</span>` : ''}
+                            </div>
+                            <p class="text-xs text-gray-600 truncate">${branch}</p>
+                            ${lastMessage ? `<p class="text-xs text-gray-500 truncate mt-1">${lastMessage}</p>` : ''}
+                        </div>
+                    </div>`;
+                }).join('');
+            }).catch(err => {
+                console.error('Error fetching conversations:', err);
+                listContainer.innerHTML = '<p class="text-center text-red-500 text-sm p-6">Error loading conversations</p>';
+            });
+        }
+
+        window.openConversation = function(conversationId, label) {
+            zoomState.currentChatId = conversationId;
+            zoomState.currentPartnerLabel = label;
+
+            // Update header
+            const chatTitleEl = document.getElementById('chat-title');
+            const chatSubtitleEl = document.getElementById('chat-subtitle');
+            if (chatTitleEl) chatTitleEl.textContent = label;
+            if (chatSubtitleEl) chatSubtitleEl.textContent = '';
+
+            // Hide initial prompt and show input
+            const initialPrompt = document.getElementById('initial-prompt');
+            const chatView = document.getElementById('chat-view');
+            const inputArea = document.getElementById('input-area');
+            
+            if (initialPrompt) initialPrompt.classList.add('hidden');
+            if (chatView) chatView.classList.remove('justify-center', 'items-center');
+            if (inputArea) inputArea.classList.remove('hidden');
+
+            // Load messages
+            loadMessages(conversationId);
+
+            window.switchView('chat');
+        };
+
+        function loadMessages(conversationId) {
+            const messagesContainer = document.getElementById('messages-container');
+            if (!messagesContainer) return;
+
+            messagesContainer.innerHTML = '<p class="text-center text-sm italic text-gray-500 p-8">Loading messages...</p>';
+            
+            apiRequest('get_messages', { conversation_id: conversationId }, 'GET').then(res => {
+                if (!res.success) {
+                    if (messagesContainer) messagesContainer.innerHTML = `<p class="text-center text-red-500 text-sm p-8">${escapeHtml(res.error || 'Failed to load messages')}</p>`;
+                    return;
+                }
+                zoomState.messages = res.messages || [];
+                renderMessages();
+            });
+        }
+
+        function renderMessages() {
+    const messagesContainer = document.getElementById('messages-container');
+    if (!messagesContainer) return;
+    
+    const initialPrompt = document.getElementById('initial-prompt');
+    if (initialPrompt) initialPrompt.classList.add('hidden');
+    
+    if (zoomState.messages.length === 0) {
+        messagesContainer.innerHTML = '<p class="text-center text-sm italic text-gray-500 p-8">Send the first message to start the conversation!</p>';
+        return;
+    }
+
+    // Get current user ID from the main window or use a default
+    const currentUserId = window.opener ? window.opener.currentUserId : (window.currentUserId || 0);
+
+    messagesContainer.innerHTML = zoomState.messages.map(m => {
+        // FIXED: Properly check if message was sent by current user
+        const isUserMessage = Number(m.SenderUserID) === Number(currentUserId);
+        const senderName = escapeHtml((m.FirstName || '') + (m.LastName ? ' ' + m.LastName : ''));
+        const timeStr = escapeHtml(fmtTime(m.Timestamp));
+
+        const bubbleClasses = isUserMessage
+            ? 'bg-indigo-600 text-white rounded-br-lg rounded-t-xl rounded-l-xl'
+            : 'bg-gray-200 text-gray-800 rounded-tl-lg rounded-t-xl rounded-r-xl';
+
+        const nameClasses = isUserMessage ? 'text-indigo-200' : 'text-indigo-600';
+        const timeClasses = isUserMessage ? 'text-indigo-300' : 'text-gray-500';
+
+        return `
+        <div class="flex mb-3 ${isUserMessage ? 'justify-end' : 'justify-start'}">
+            <div class="max-w-[85%] p-3 shadow-md ${bubbleClasses}">
+                <p class="text-xs font-semibold ${nameClasses} mb-1">${senderName}</p>
+                <p class="text-base break-words">${escapeHtml(m.MessageContent)}</p>
+                <p class="text-right text-xs mt-1 ${timeClasses}">${timeStr}</p>
+            </div>
+        </div>`;
+    }).join('');
+
+    // Scroll to bottom
+    setTimeout(() => {
+        const messageArea = document.getElementById('message-container-wrapper');
+        if (messageArea) {
+            messageArea.scrollTop = messageArea.scrollHeight;
+        }
+    }, 100);
+}
+
+        window.sendMessage = async function() {
+            const messageInput = document.getElementById('message-input');
+            const content = messageInput.value.trim();
+            
+            if (!zoomState.currentChatId) {
+                alert('Please select a conversation first');
+                return;
+            }
+            
+            if (!content) {
+                alert('Please enter a message');
+                return;
+            }
+
+            // Clear input and focus
+            messageInput.value = '';
+            messageInput.focus();
+
+            try {
+                const res = await apiRequest('send_message', { 
+                    conversation_id: zoomState.currentChatId, 
+                    message: content 
+                }, 'POST');
+                
+                if (res.success && res.message) {
+                    // Add new message to state and render
+                    zoomState.messages.push(res.message);
+                    renderMessages();
+                    
+                    // Refresh conversations list
+                    fetchConversationsForZoom();
+                } else {
+                    const errorMsg = res.error || 'Unknown error occurred';
+                    alert('Failed to send message: ' + errorMsg);
+                }
+            } catch (err) {
+                console.error('Error sending message:', err);
+                alert('Network error: Please check your connection and try again.');
+            }
+        };
+
+        window.switchView = function(view) {
+            const contactsSidebar = document.getElementById('contacts-sidebar');
+            const chatView = document.getElementById('chat-view');
+            const backButton = document.getElementById('back-button');
+            const initialPrompt = document.getElementById('initial-prompt');
+            const inputArea = document.getElementById('input-area');
+            
+            if (!contactsSidebar || !chatView || !backButton) return;
+            
+            if (view === 'chat') {
+                contactsSidebar.style.display = 'none';
+                chatView.style.display = 'flex';
+                backButton.classList.remove('hidden');
+            } else {
+                contactsSidebar.style.display = 'flex';
+                chatView.style.display = 'none';
+                backButton.classList.add('hidden');
+                // Reset to initial state
+                if (initialPrompt) initialPrompt.classList.remove('hidden');
+                if (inputArea) inputArea.classList.add('hidden');
+                zoomState.currentChatId = null;
+            }
+        };
+
+        window.clearMessages = async function() {
+            if (!zoomState.currentChatId) {
+                alert('No conversation selected');
+                return;
+            }
+
+            if (confirm('⚠️ WARNING: This will permanently delete ALL messages in this conversation from the database. This action cannot be undone!\n\nAre you sure you want to delete all messages?')) {
+                try {
+                    const messagesContainer = document.getElementById('messages-container');
+                    if (messagesContainer) {
+                        messagesContainer.innerHTML = '<p class="text-center text-sm italic text-gray-500 p-8">Deleting messages...</p>';
+                    }
+
+                    const res = await apiRequest('delete_messages', { 
+                        conversation_id: zoomState.currentChatId 
+                    }, 'POST');
+                    
+                    if (res.success) {
+                        zoomState.messages = [];
+
+                        if (messagesContainer) {
+                            messagesContainer.innerHTML = '<p class="text-center text-sm text-green-600 p-8">All messages have been permanently deleted from the database.</p>';
+                        }
+
+                        // Refresh conversations list
+                        fetchConversationsForZoom();
+                    } else {
+                        alert('Failed to delete messages: ' + (res.error || 'Unknown error'));
+                        loadMessages(zoomState.currentChatId);
+                    }
+                } catch (err) {
+                    console.error('Error deleting messages:', err);
+                    alert('Error deleting messages: ' + err.message);
+                    loadMessages(zoomState.currentChatId);
+                }
+            }
+        };
+
         window.toggleZoom = function() {
             // Close this zoom window
             window.close();
         };
-        
-        // Helper functions for zoom window
-        function escapeHtml(s) {
-            if (s === undefined || s === null) return '';
-            return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
-        }
-        
-        function initials(name) {
-            const parts = String(name || '').trim().split(/\s+/);
-            const first = parts[0] ? parts[0][0] : '';
-            const second = parts[1] ? parts[1][0] : '';
-            return (first + second).toUpperCase() || '?';
-        }
 
         // Close window when clicking outside
         document.addEventListener('click', (e) => {
@@ -674,6 +972,38 @@
                 window.close();
             }
         });
+
+        // Add this to chat_zoom_modal.php in the script section
+function startMessagePollingForZoom() {
+    // Check for new messages every 3 seconds when in a conversation
+    setInterval(() => {
+        if (zoomState.currentChatId) {
+            checkForNewMessagesInZoom();
+        }
+    }, 3000);
+}
+
+function checkForNewMessagesInZoom() {
+    if (!zoomState.currentChatId) return;
+    
+    apiRequest('get_messages', { conversation_id: zoomState.currentChatId }, 'GET').then(res => {
+        if (res.success) {
+            const newMessages = res.messages || [];
+            const currentMessageCount = zoomState.messages.length;
+            
+            // Only update if new messages arrived
+            if (newMessages.length > currentMessageCount) {
+                zoomState.messages = newMessages;
+                renderMessages();
+                
+                // Also refresh conversations list in zoom window
+                fetchConversationsForZoom();
+            }
+        }
+    }).catch(err => {
+        console.error('Error checking for new messages in zoom:', err);
+    });
+}
     </script>
 </body>
 </html>

@@ -1,7 +1,4 @@
-<?php
-// Cross-Branch Chat Component - Separated from sidebar to avoid conflicts
-// This component can be included in any page that needs cross-branch chat functionality
-?>
+
 <!-- Cross-Branch Chat Widget (Separated Component) -->
 <div id="cross-branch-chat-container" class="mb-6">
     <div id="main-container" class="main-container flex bg-white overflow-hidden shadow-xl rounded-lg">
@@ -51,6 +48,14 @@
                         <p id="chat-subtitle" class="text-sm text-gray-500"></p>
                     </div>
                 </div>
+                <div class="flex items-center space-x-2">
+                    <!-- Updated Clear Messages Button with Better Tooltip -->
+                    <button id="clear-messages-btn" onclick="window.clearMessages()" class="text-gray-500 hover:text-red-600 p-1 rounded-full transition duration-150" title="Clear messages from view (does not delete from database)">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Messages Area -->
@@ -75,7 +80,7 @@
                     <input type="text" id="message-input" placeholder="Write a message..." 
                            class="flex-1 p-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-900" 
                            style="color: #111827 !important;">
-                    <button id="send-btn" onclick="window.sendMessage()" >
+                    <button id="send-btn" onclick="window.sendMessage()" class="bg-indigo-600 text-white p-2 rounded-full hover:bg-indigo-700 transition duration-150">
                         <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M16.6915026,12.4744748 L3.50612381,13.2599618 C3.19218622,13.2599618 3.03521743,13.4170592 3.03521743,13.5741566 L1.15159189,20.0151496 C0.8376543,20.8006365 0.99,21.89 1.77946707,22.52 C2.41,22.99 3.50612381,23.1 4.13399899,22.8429026 L21.714504,14.0454487 C22.6563168,13.5741566 23.1272231,12.6315722 22.9702544,11.6889879 L4.13399899,1.16346272 C3.34915502,0.9 2.40734225,1.00636533 1.77946707,1.4776575 C0.994623095,2.10604706 0.837654326,3.0486314 1.15159189,3.99701575 L3.03521743,10.4380088 C3.03521743,10.5951061 3.19218622,10.7522035 3.50612381,10.7522035 L16.6915026,11.5376905 C16.6915026,11.5376905 17.1624089,11.5376905 17.1624089,12.0089827 C17.1624089,12.4744748 16.6915026,12.4744748 16.6915026,12.4744748 Z"/>
                         </svg>
@@ -111,4 +116,4 @@
         </div>
     </div>
 </div>
-
+[file content end]
