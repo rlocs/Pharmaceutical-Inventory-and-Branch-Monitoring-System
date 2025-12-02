@@ -13,7 +13,7 @@ if (!isset($_SESSION["loggedin"]) || $_SESSION["loggedin"] !== true) {
 }
 
 // 2. Check Role: Only Staff or Admin can view this page.
-if ($_SESSION["user_role"] !== 'Staff' && $_SESSION["user_role"] !== 'Admin') {
+if ($_SESSION["user_role"] !== 'Staff' && $_SESSION["user_role"] !== 'Staff') {
     die("ERROR: You do not have permission to view this page.");
 }
 

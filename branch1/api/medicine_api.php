@@ -158,6 +158,7 @@ function getMedicine($pdo) {
 function getMedicines($pdo) {
     $branch_id = $_SESSION['branch_id'];
     $category_filter = $_GET['category'] ?? '';
+    $search_term = $_GET['search'] ?? '';
     $page = (int)($_GET['page'] ?? 1);
     $limit = 10; // Items per page
     $offset = ($page - 1) * $limit;
@@ -170,6 +171,16 @@ function getMedicines($pdo) {
         // Category filter is now a category name, not ID
         $where .= " AND c.CategoryName = ?";
         $params[] = $category_filter;
+    }
+
+    if (!empty($search_term)) {
+        // Search across MedicineName, CategoryName, Form, Unit
+        $where .= " AND (m.MedicineName LIKE ? OR c.CategoryName LIKE ? OR m.Form LIKE ? OR m.Unit LIKE ?)";
+        $search_param = '%' . $search_term . '%';
+        $params[] = $search_param;
+        $params[] = $search_param;
+        $params[] = $search_param;
+        $params[] = $search_param;
     }
 
     // Get total count

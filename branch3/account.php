@@ -336,8 +336,8 @@ try {
                                     </div>
                                     <textarea id="note-text" rows="4" class="w-full border border-gray-300 rounded-lg p-2" placeholder="Enter your note..."></textarea>
                                     <div class="flex justify-end mt-4 space-x-2">
-                                        <button id="cancel-note" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Cancel</button>
-                                        <button id="save-note" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save</button>
+                                        <button type="button" id="cancel-note" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">Cancel</button>
+                                        <button type="button" id="save-note" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">Save</button>
                                     </div>
                                 </div>
                             </div>

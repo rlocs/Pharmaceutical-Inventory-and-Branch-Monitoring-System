@@ -184,8 +184,8 @@ for ($i = 6; $i >= 0; $i--) {
     ];
 }
 
-// 8. Top 10 Bestselling Medicines
-$top_bestsellers_stmt = executeStoredProcedure($conn, 'SP_GetTopBestsellers', [$current_branch_id]);
+// 8. Top 10 Bestselling Medicines - FIXED: Added second parameter
+$top_bestsellers_stmt = executeStoredProcedure($conn, 'SP_GetTopBestsellers', [$current_branch_id, 10]);
 $top_bestsellers = $top_bestsellers_stmt->fetchAll(PDO::FETCH_ASSOC);
 $top_bestsellers_stmt->closeCursor();
 
