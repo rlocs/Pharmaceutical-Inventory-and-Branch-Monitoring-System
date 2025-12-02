@@ -12,7 +12,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const categoryFilter = document.getElementById('categoryFilter');
     if (categoryFilter) {
         categoryFilter.addEventListener('change', function() {
-            loadMedicines(1, this.value);
+            const searchInput = document.getElementById('searchInput');
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
+            loadMedicines(1, this.value, searchTerm);
         });
     }
 
@@ -30,7 +32,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 newPage = currentPage + 1;
             }
 
-            loadMedicines(newPage, categoryFilter ? categoryFilter.value : '');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const searchInput = document.getElementById('searchInput');
+            const category = categoryFilter ? categoryFilter.value : '';
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
+            loadMedicines(newPage, category, searchTerm);
         }
     });
 
@@ -81,7 +87,7 @@ function apiRequest(action, params = {}, method = 'GET') {
     return fetch(url, opts).then(r => r.json());
 }
 
-function loadMedicines(page = 1, category = '') {
+function loadMedicines(page = 1, category = '', searchTerm = '') {
     const tbody = document.querySelector('#dynamic-content table tbody');
     if (!tbody) return;
 
@@ -89,6 +95,7 @@ function loadMedicines(page = 1, category = '') {
 
     const params = { page };
     if (category) params.category = category;
+    if (searchTerm) params.search = searchTerm;
 
     apiRequest('get_medicines', params, 'GET').then(res => {
         if (!res.success) {
@@ -100,7 +107,8 @@ function loadMedicines(page = 1, category = '') {
         tbody.innerHTML = '';
 
         if (medicines.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4">No medicines found.</td></tr>';
+            const message = searchTerm ? `No medicines found matching "${escapeHtml(searchTerm)}"` : 'No medicines found.';
+            tbody.innerHTML = `<tr><td colspan="9" class="text-center py-4">${message}</td></tr>`;
         } else {
             medicines.forEach(med => {
                 const row = createMedicineRow(med);
@@ -376,11 +384,15 @@ function addMedicine() {
     apiRequest('add_medicine', data, 'POST').then(res => {
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
-        
+
         if (res.success) {
             closeAddModal();
             form.reset();
-            loadMedicines();
+            const searchInput = document.getElementById('searchInput');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
+            const category = categoryFilter ? categoryFilter.value : '';
+            loadMedicines(1, category, searchTerm);
             loadAlerts();
             showNotification('Medicine added successfully!', 'success');
         } else {
@@ -501,10 +513,14 @@ function updateMedicine() {
     apiRequest('update_medicine', data, 'POST').then(res => {
         submitBtn.disabled = false;
         submitBtn.textContent = originalText;
-        
+
         if (res.success) {
             closeEditModal();
-            loadMedicines();
+            const searchInput = document.getElementById('searchInput');
+            const categoryFilter = document.getElementById('categoryFilter');
+            const searchTerm = searchInput ? searchInput.value.trim() : '';
+            const category = categoryFilter ? categoryFilter.value : '';
+            loadMedicines(1, category, searchTerm);
             loadAlerts();
             showNotification('Medicine updated successfully!', 'success');
         } else {

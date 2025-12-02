@@ -272,13 +272,7 @@ function escapeHtml($text) {
                     <!-- Toolbar: Search, Category Filter and Add Button -->
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 space-y-4 md:space-y-0">
                         <div class="flex flex-col md:flex-row w-full md:w-2/3 gap-4">
-                            <!-- Search Bar -->
-                            <div class="relative w-full md:w-1/3">
-                                <input type="text" id="searchInput" placeholder="Search medicines..." class="w-full py-2 pl-10 pr-4 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent bg-[#F4F6FA]">
-                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <i data-lucide="search" class="h-5 w-5 text-gray-400"></i>
-                                </div>
-                            </div>
+
                             <!-- Category Filter -->
                             <div class="relative w-full md:w-1/3">
                                 <select id="categoryFilter" class="w-full py-2 pl-4 pr-8 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-accent appearance-none bg-[#F4F6FA]">
