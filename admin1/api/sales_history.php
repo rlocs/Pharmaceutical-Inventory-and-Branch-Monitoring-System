@@ -34,9 +34,29 @@ try {
     $db = new Database();
     $conn = $db->getConnection();
 
-    // Get user's branch ID from session
+    // Get user's branch ID from session and role
     $userBranchID = $_SESSION['branch_id'] ?? null;
-    if (!$userBranchID) {
+    $userRole = $_SESSION['user_role'] ?? null;
+
+    // Check if branch_id is provided in query parameters (for admin cross-branch access)
+    $requestedBranchID = isset($_GET['branch_id']) ? intval($_GET['branch_id']) : null;
+
+    // Determine which branch ID to use
+    if ($userRole === 'Admin' && $requestedBranchID) {
+        // Admin can access any branch
+        $branchID = $requestedBranchID;
+    } elseif ($userRole === 'Staff' && $requestedBranchID && $requestedBranchID === $userBranchID) {
+        // Staff can only access their own branch
+        $branchID = $requestedBranchID;
+    } elseif ($userRole === 'Staff' && !$requestedBranchID) {
+        // Staff accessing their own branch without specifying
+        $branchID = $userBranchID;
+    } else {
+        // Default to user's branch or error if not found
+        $branchID = $userBranchID;
+    }
+
+    if (!$branchID) {
         ob_clean();
         http_response_code(403);
         echo json_encode(['error' => 'Branch ID not found in session']);
@@ -57,7 +77,7 @@ try {
 
     // Build WHERE clause for date filtering
     $whereClause = "WHERE t.BranchID = :branch_id";
-    $params = [':branch_id' => $userBranchID];
+    $params = [':branch_id' => $branchID];
 
     if ($startDate && $endDate) {
         $whereClause .= " AND DATE(t.TransactionDateTime) BETWEEN :start_date AND :end_date";
@@ -143,7 +163,7 @@ try {
 
         $summaryStmt = $conn->prepare($summarySql);
         // Use only the relevant parameters for summary (exclude pagination params)
-        $summaryParams = [':branch_id' => $userBranchID];
+        $summaryParams = [':branch_id' => $branchID];
         if ($startDate && $endDate) {
             $summaryParams[':start_date'] = $startDate;
             $summaryParams[':end_date'] = $endDate;

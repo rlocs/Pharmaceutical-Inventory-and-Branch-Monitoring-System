@@ -18,9 +18,9 @@ if ($_SESSION["user_role"] !== 'Staff' && $_SESSION["user_role"] !== 'Admin') {
     die("ERROR: You do not have permission to view this page.");
 }
 
-// 3. Check Branch (Crucial for Staff access). This file is for Branch 1.
-// Admins are not restricted by BranchID, but Staff MUST be from Branch 1.
-$required_branch_id = 1;
+// 3. Check Branch (Crucial for Staff access).
+// Admins are not restricted by BranchID, but Staff MUST be from the required branch.
+$required_branch_id =2;
 if ($required_branch_id > 0 && $_SESSION["user_role"] === 'Staff' && $_SESSION["branch_id"] != $required_branch_id) {
     // Redirect staff who ended up on the wrong branch page
     header("Location: ../login.php?error=branch_mismatch"); 
@@ -254,9 +254,9 @@ try {
         
         <div class="mb-4">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Quantity</label>
-            <input type="number" id="qty_input" value="" placeholder=""
-                   class="w-full bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300"
-                   onclick="activeTarget='qty'; updateInputHighlight();">
+<input type="number" id="qty_input" value="" placeholder="Enter quantity"
+       class="w-full bg-[#F4F6FA] border border-gray-200 text-gray-800 text-xl font-bold rounded-xl px-4 py-3 text-center focus:outline-none transition-all cursor-pointer placeholder-gray-300"
+       onclick="activeTarget='qty'; updateInputHighlight();">
         </div>
         <div class="mb-4">
             <label class="block text-xs font-bold text-gray-400 uppercase mb-1 ml-1">Discount & VAT</label>

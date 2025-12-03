@@ -1,0 +1,109 @@
+
+/* Payment Method Pills (Aligned with DB ENUM) */
+.status-pill {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.pill-cash { background-color: #e6fffa; color: #047857; border: 1px solid #b7eb8f; } /* Green */
+.pill-card { background-color: #fff7e6; color: #d46b08; border: 1px solid #ffd591; } /* Orange */
+.pill-gcash { background-color: #e6f7ff; color: #096dd9; border: 1px solid #91d5ff; } /* Blue */
+
+.action-btn {
+    background-color: #edf2f7;
+    color: #2d3748;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+.action-btn:hover { background-color: #e2e8f0; }
+
+/* --- RECEIPT MODAL (THE "STORED RECEIPT") --- */
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+
+.receipt-modal {
+    background: white;
+    padding: 0;
+    border-radius: 8px;
+    width: 380px; /* Thermal printer width simulation */
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+
+.receipt-header-bar {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.receipt-body {
+    padding: 20px;
+    overflow-y: auto;
+    background: #fff;
+    font-family: 'Courier New', Courier, monospace; /* Receipt Font */
+}
+
+/* Thermal Printer CSS Styling */
+.receipt-paper {
+    width: 100%;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #000;
+}
+.rp-header { text-align: center; margin-bottom: 15px; }
+.rp-title { font-size: 16px; font-weight: bold; text-transform: uppercase; }
+.rp-info { font-size: 11px; color: #333; }
+.rp-dashed { border-top: 1px dashed #000; margin: 10px 0; }
+
+.rp-table { width: 100%; }
+.rp-table td { padding: 2px 0; border: none; }
+.rp-right { text-align: right; }
+
+.rp-total-section { margin-top: 10px; font-weight: bold; }
+.rp-footer { text-align: center; margin-top: 20px; font-size: 10px; }
+
+.receipt-actions {
+    padding: 15px;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    background: #f9f9f9;
+    border-radius: 0 0 8px 8px;
+}
+
+/* Print Specifics */
+@media print {
+    body * { visibility: hidden; }
+    #printable-receipt-area, #printable-receipt-area * { visibility: visible; }
+    #printable-receipt-area { 
+        position: absolute; 
+        left: 0; 
+        top: 0; 
+        width: 100%; 
+        padding: 0;
+        margin: 0;
+    }
+    .modal-overlay { position: static; display: block; background: white; }
+    .receipt-actions, .receipt-header-bar { display: none; }
+}

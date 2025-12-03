@@ -1,118 +1,55 @@
-// --- Mock Data Store for Branches ---
-const dashboardData = {
+// --- Real Data Store for Dashboard ---
+let dashboardData = {
     'all': {
         name: 'All Branches (Consolidated)',
-        salesToday: '₱128,450.00',
-        transactions: '1,204 transactions today',
-        revenueMonth: '₱4,250,890.00',
-        alerts: '45',
-        weeklySales: '₱933,450.00',
-        inventoryValue: '₱542,100.00',
+        salesToday: '--',
+        transactions: '--',
+        revenueMonth: '--',
+        alerts: '--',
+        weeklySales: '--',
+        inventoryValue: '--',
         paymentStats: {
-            cash: { amt: '₱521.58', count: 19 },
-            card: { amt: '₱161.87', count: 7 },
-            credit: { amt: '₱41.50', count: 2 }
+            cash: { amt: '--', count: 0 },
+            card: { amt: '--', count: 0 },
+            credit: { amt: '--', count: 0 }
         },
-        inventory: { active: 38, low: 8, out: 5, expiring: 5, expired: 10 },
-        topMedicines: [
-            { name: 'Paracetamol 500mg', qty: 1200 },
-            { name: 'Amoxicillin 500mg', qty: 950 },
-            { name: 'Vitamin C 500mg', qty: 800 },
-            { name: 'Losartan 50mg', qty: 750 },
-            { name: 'Amlodipine 10mg', qty: 600 },
-            { name: 'Simvastatin 20mg', qty: 550 },
-            { name: 'Metformin 500mg', qty: 500 },
-            { name: 'Omeprazole 20mg', qty: 450 },
-            { name: 'Ibuprofen 400mg', qty: 400 },
-            { name: 'Cetirizine 10mg', qty: 350 }
-        ],
-        weeklyTrend: [
-            { day: 'Mon', sales: 125000 },
-            { day: 'Tue', sales: 110000 },
-            { day: 'Wed', sales: 140000 },
-            { day: 'Thu', sales: 128450 },
-            { day: 'Fri', sales: 160000 },
-            { day: 'Sat', sales: 180000 },
-            { day: 'Sun', sales: 90000 }
-        ],
-        categorySales: [
-            { label: 'Antibiotics', value: 135000, color: 'bg-blue-500' },
-            { label: 'Pain Relief', value: 128000, color: 'bg-green-500' },
-            { label: 'Vitamins', value: 115000, color: 'bg-yellow-500' },
-            { label: 'Chronic Care', value: 98000, color: 'bg-purple-500' },
-            { label: 'First Aid', value: 45000, color: 'bg-red-500' }
-        ]
-    },
-    'branch1': {
-        id: 'branch1',
-        name: 'Branch 1',
-        salesToday: '₱65,200.00',
-        transactions: '540 transactions today',
-        revenueMonth: '₱2,100,500.00',
-        alerts: '12',
-        weeklySales: '₱450.00',
-        inventoryValue: '₱280,000.00',
-        paymentStats: { cash: { amt: '₱300.00', count: 10 }, card: { amt: '₱100.00', count: 4 }, credit: { amt: '₱50.00', count: 2 } },
-        inventory: { active: 90, low: 5, out: 2, expiring: 10, expired: 2 },
-        topMedicines: [ { name: 'Paracetamol 500mg', qty: 600 }, { name: 'Amoxicillin 500mg', qty: 400 }, { name: 'Vitamin C 500mg', qty: 350 }, { name: 'Losartan 50mg', qty: 300 }, { name: 'Amlodipine 10mg', qty: 250 }, { name: 'Simvastatin 20mg', qty: 200 }, { name: 'Metformin 500mg', qty: 180 }, { name: 'Omeprazole 20mg', qty: 150 }, { name: 'Ibuprofen 400mg', qty: 120 }, { name: 'Cetirizine 10mg', qty: 100 } ],
-        weeklyTrend: [
-            { day: 'Mon', sales: 60000 }, { day: 'Tue', sales: 55000 }, { day: 'Wed', sales: 70000 }, { day: 'Thu', sales: 65200 }, { day: 'Fri', sales: 80000 }, { day: 'Sat', sales: 85000 }, { day: 'Sun', sales: 40000 }
-        ],
-        categorySales: [
-            { label: 'Antibiotics', value: 65000, color: 'bg-blue-500' },
-            { label: 'Pain Relief', value: 60000, color: 'bg-green-500' },
-            { label: 'Vitamins', value: 55000, color: 'bg-yellow-500' },
-            { label: 'Chronic Care', value: 45000, color: 'bg-purple-500' },
-            { label: 'First Aid', value: 20000, color: 'bg-red-500' }
-        ]
-    },
-    'branch2': {
-        id: 'branch2',
-        name: 'Branch 2',
-        salesToday: '₱42,150.00',
-        transactions: '380 transactions today',
-        revenueMonth: '₱1,450,200.00',
-        alerts: '25',
-        weeklySales: '₱174.95',
-        inventoryValue: '₱150,500.00',
-        paymentStats: { cash: { amt: '₱121.58', count: 5 }, card: { amt: '₱41.87', count: 2 }, credit: { amt: '₱11.50', count: 1 } },
-        inventory: { active: 40, low: 8, out: 8, expiring: 20, expired: 5 },
-        topMedicines: [ { name: 'Paracetamol 500mg', qty: 300 }, { name: 'Amoxicillin 500mg', qty: 250 }, { name: 'Vitamin C 500mg', qty: 200 }, { name: 'Losartan 50mg', qty: 180 }, { name: 'Amlodipine 10mg', qty: 150 }, { name: 'Simvastatin 20mg', qty: 130 }, { name: 'Metformin 500mg', qty: 120 }, { name: 'Omeprazole 20mg', qty: 100 }, { name: 'Ibuprofen 400mg', qty: 90 }, { name: 'Cetirizine 10mg', qty: 80 } ],
-        weeklyTrend: [
-            { day: 'Mon', sales: 40000 }, { day: 'Tue', sales: 38000 }, { day: 'Wed', sales: 45000 }, { day: 'Thu', sales: 42150 }, { day: 'Fri', sales: 50000 }, { day: 'Sat', sales: 55000 }, { day: 'Sun', sales: 30000 }
-        ],
-        categorySales: [
-            { label: 'Antibiotics', value: 40000, color: 'bg-blue-500' },
-            { label: 'Pain Relief', value: 38000, color: 'bg-green-500' },
-            { label: 'Vitamins', value: 35000, color: 'bg-yellow-500' },
-            { label: 'Chronic Care', value: 30000, color: 'bg-purple-500' },
-            { label: 'First Aid', value: 15000, color: 'bg-red-500' }
-        ]
-    },
-    'branch3': {
-        id: 'branch3',
-        name: 'Branch 3',
-        salesToday: '₱21,100.00',
-        transactions: '284 transactions today',
-        revenueMonth: '₱700,190.00',
-        alerts: '8',
-        weeklySales: '₱100.00',
-        inventoryValue: '₱111,600.00',
-        paymentStats: { cash: { amt: '₱100.00', count: 4 }, card: { amt: '₱20.00', count: 1 }, credit: { amt: '₱0.00', count: 0 } },
-        inventory: { active: 20, low: 5, out: 2, expiring: 5, expired: 3 },
-        topMedicines: [ { name: 'Paracetamol 500mg', qty: 300 }, { name: 'Amoxicillin 500mg', qty: 300 }, { name: 'Vitamin C 500mg', qty: 250 }, { name: 'Losartan 50mg', qty: 270 }, { name: 'Amlodipine 10mg', qty: 200 }, { name: 'Simvastatin 20mg', qty: 220 }, { name: 'Metformin 500mg', qty: 200 }, { name: 'Omeprazole 20mg', qty: 200 }, { name: 'Ibuprofen 400mg', qty: 190 }, { name: 'Cetirizine 10mg', qty: 170 } ],
-        weeklyTrend: [
-            { day: 'Mon', sales: 25000 }, { day: 'Tue', sales: 17000 }, { day: 'Wed', sales: 25000 }, { day: 'Thu', sales: 21100 }, { day: 'Fri', sales: 30000 }, { day: 'Sat', sales: 40000 }, { day: 'Sun', sales: 20000 }
-        ],
-        categorySales: [
-            { label: 'Antibiotics', value: 30000, color: 'bg-blue-500' },
-            { label: 'Pain Relief', value: 30000, color: 'bg-green-500' },
-            { label: 'Vitamins', value: 25000, color: 'bg-yellow-500' },
-            { label: 'Chronic Care', value: 23000, color: 'bg-purple-500' },
-            { label: 'First Aid', value: 10000, color: 'bg-red-500' }
-        ]
+        inventory: { active: 0, low: 0, out: 0, expiring: 0, expired: 0 },
+        topMedicines: [],
+        weeklyTrend: [],
+        categorySales: []
     }
 };
+
+// --- Function to Fetch Real Data from API ---
+async function fetchDashboardData() {
+    try {
+        const response = await fetch('api/dashboard_api.php');
+        const result = await response.json();
+
+        if (result.success && result.data) {
+            // Update the dashboardData with real data
+            const data = result.data;
+            dashboardData['all'] = {
+                name: 'All Branches (Consolidated)',
+                salesToday: data.salesToday,
+                transactions: data.transactions,
+                revenueMonth: data.revenueMonth,
+                alerts: data.alerts,
+                weeklySales: data.weeklySales,
+                inventoryValue: data.inventoryValue,
+                paymentStats: data.paymentStats,
+                inventory: data.inventory,
+                topMedicines: data.topMedicines,
+                weeklyTrend: data.weeklyTrend,
+                categorySales: data.categorySales
+            };
+        } else {
+            console.error('Failed to fetch dashboard data:', result.error);
+        }
+    } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+    }
+}
 
 // Track current branch for export functionality
 let currentBranch = 'all';
@@ -398,7 +335,8 @@ function updateClockStatic() {
 }
 
 // Init
-window.onload = function() {
+window.onload = async function() {
+    await fetchDashboardData();
     switchBranch('all');
     updateClockStatic();
 };

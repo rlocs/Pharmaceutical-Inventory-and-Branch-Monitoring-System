@@ -1206,9 +1206,9 @@ BEGIN
     ORDER BY sale_date ASC;
 END //
 
--- Stored Procedure for Top 10 Bestselling Medicines
 CREATE PROCEDURE SP_GetTopBestsellers (
-    IN p_BranchID INT
+    IN p_BranchID INT,
+    IN p_LimitCount INT
 )
 BEGIN
     SELECT m.MedicineID, m.MedicineName, SUM(ti.Quantity) AS total_qty, SUM(ti.Subtotal) AS total_sales
@@ -1219,7 +1219,7 @@ BEGIN
     WHERE st.BranchID = p_BranchID
     GROUP BY m.MedicineID, m.MedicineName
     ORDER BY total_qty DESC
-    LIMIT 10;
+    LIMIT p_LimitCount;
 END //
 
 DELIMITER ;
